@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volunteer Management System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top for better scrolling */
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 1200px;
+            padding: 32px;
+            box-sizing: border-box;
+        }
+        .form-input {
+            @apply w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200;
+        }
+        .btn-primary {
+            @apply bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-200 shadow-md;
+        }
+        .btn-secondary {
+            @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition duration-200;
+        }
+        .tab-button {
+            @apply px-4 py-2 rounded-t-lg font-medium text-gray-600 hover:bg-gray-100 transition duration-200;
+        }
+        .tab-button.active {
+            @apply bg-white border-b-2 border-blue-600 text-blue-600;
+        }
+        .message-box {
+            @apply p-3 mt-4 rounded-lg text-sm;
+        }
+        .message-box.success {
+            @apply bg-green-100 text-green-700 border border-green-200;
+        }
+        .message-box.error {
+            @apply bg-red-100 text-red-700 border border-red-200;
+        }
+        .table-header th {
+            @apply px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+        }
+        .table-row td {
+            @apply px-4 py-3 whitespace-nowrap text-sm text-gray-800;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Volunteer Management System</h1>
+
+        <!-- Login Section -->
+        <section id="login-section" class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-6 text-center">Login</h2>
+            <form id="login-form" class="space-y-5">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" id="email" name="email" class="form-input" required>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                    <input type="password" id="password" name="password" class="form-input" required>
+                </div>
+                <button type="submit" class="btn-primary w-full">Log In</button>
+            </form>
+            <div id="login-message" class="message-box hidden"></div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="dashboard-section" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-semibold text-gray-700">Welcome, <span id="user-name"></span> (<span id="user-role"></span>)</h2>
+                <button id="logout-button" class="btn-secondary">Logout</button>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="border-b border-gray-200 mb-6">
+                <nav class="-mb-px flex space-x-4" id="dashboard-tabs">
+                    <!-- Tabs will be dynamically added here based on role -->
+                </nav>
+            </div>
+
+            <!-- Tab Content Areas -->
+
+            <!-- Volunteer Tabs -->
+            <div id="volunteer-assigned-tasks" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">My Assigned Tasks</h3>
+                <div id="assigned-tasks-list" class="space-y-4"></div>
+            </div>
+
+            <div id="volunteer-attendance" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Submit Attendance</h3>
+                <form id="submit-attendance-form" class="space-y-4 mb-6">
+                    <div>
+                        <label for="attendance-task-id" class="block text-sm font-medium text-gray-700 mb-1">Task</label>
+                        <select id="attendance-task-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="attendance-date" class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                        <input type="date" id="attendance-date" class="form-input" value="" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Submit Attendance</button>
+                </form>
+                <div id="attendance-message" class="message-box hidden"></div>
+
+                <h3 class="text-xl font-semibold text-gray-700 mb-4 mt-8">My Attendance History</h3>
+                <div id="my-attendance-history"></div>
+            </div>
+
+            <div id="volunteer-ratings" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">My Ratings & Feedback</h3>
+                <div id="my-ratings-list"></div>
+            </div>
+
+            <div id="volunteer-profile" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">My Profile</h3>
+                <form id="update-profile-form" class="space-y-4">
+                    <div>
+                        <label for="profile-name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" id="profile-name" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="profile-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="profile-email" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="profile-contact" class="block text-sm font-medium text-gray-700 mb-1">Contact</label>
+                        <input type="text" id="profile-contact" class="form-input">
+                    </div>
+                    <div>
+                        <label for="profile-new-password" class="block text-sm font-medium text-gray-700 mb-1">New Password (optional)</label>
+                        <input type="password" id="profile-new-password" class="form-input">
+                    </div>
+                    <button type="submit" class="btn-primary">Update Profile</button>
+                </form>
+                <div id="profile-message" class="message-box hidden"></div>
+            </div>
+
+            <!-- Coordinator Tabs -->
+            <div id="coordinator-assign-tasks" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Assign Tasks to Volunteers</h3>
+                <form id="assign-task-form" class="space-y-4 mb-6">
+                    <div>
+                        <label for="assign-task-id" class="block text-sm font-medium text-gray-700 mb-1">Task</label>
+                        <select id="assign-task-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="assign-volunteer-id" class="block text-sm font-medium text-gray-700 mb-1">Volunteer</label>
+                        <select id="assign-volunteer-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="assign-priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                        <select id="assign-priority" class="form-input">
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="assign-deadline" class="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
+                        <input type="date" id="assign-deadline" class="form-input">
+                    </div>
+                    <button type="submit" class="btn-primary">Assign Task</button>
+                </form>
+                <div id="assign-task-message" class="message-box hidden"></div>
+
+                <h3 class="text-xl font-semibold text-gray-700 mb-4 mt-8">Reassign Task</h3>
+                <form id="reassign-task-form" class="space-y-4">
+                    <div>
+                        <label for="reassign-task-select" class="block text-sm font-medium text-gray-700 mb-1">Select Task to Reassign</label>
+                        <select id="reassign-task-select" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="reassign-volunteer-id" class="block text-sm font-medium text-gray-700 mb-1">New Volunteer</label>
+                        <select id="reassign-volunteer-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">Reassign Task</button>
+                </form>
+                <div id="reassign-task-message" class="message-box hidden"></div>
+            </div>
+
+            <div id="coordinator-attendance" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Volunteer Attendance Logs (Read-Only)</h3>
+                <div class="flex space-x-4 mb-4">
+                    <input type="text" id="coord-attendance-volunteer-filter" placeholder="Filter by Volunteer ID" class="form-input w-1/3">
+                    <input type="date" id="coord-attendance-date-filter" class="form-input w-1/3">
+                    <button id="coord-attendance-filter-btn" class="btn-secondary">Filter</button>
+                    <button id="coord-attendance-reset-btn" class="btn-secondary">Reset</button>
+                </div>
+                <div id="coordinator-attendance-list"></div>
+            </div>
+
+            <div id="coordinator-ratings" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Submit Volunteer Rating</h3>
+                <form id="submit-rating-form" class="space-y-4 mb-6">
+                    <div>
+                        <label for="rating-volunteer-id" class="block text-sm font-medium text-gray-700 mb-1">Volunteer</label>
+                        <select id="rating-volunteer-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="rating-task-id" class="block text-sm font-medium text-gray-700 mb-1">Task</label>
+                        <select id="rating-task-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="rating-score" class="block text-sm font-medium text-gray-700 mb-1">Score (1-5)</label>
+                        <input type="number" id="rating-score" class="form-input" min="1" max="5" required>
+                    </div>
+                    <div>
+                        <label for="rating-comments" class="block text-sm font-medium text-gray-700 mb-1">Comments</label>
+                        <textarea id="rating-comments" class="form-input h-24" required></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Submit Rating</button>
+                </form>
+                <div id="submit-rating-message" class="message-box hidden"></div>
+
+                <h3 class="text-xl font-semibold text-gray-700 mb-4 mt-8">My Submitted Ratings</h3>
+                <div id="my-submitted-ratings-list"></div>
+            </div>
+
+            <div id="coordinator-expenses" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Expense Reports (Read-Only)</h3>
+                <div class="flex space-x-4 mb-4">
+                    <input type="text" id="coord-expense-task-filter" placeholder="Filter by Task ID" class="form-input w-1/3">
+                    <input type="text" id="coord-expense-category-filter" placeholder="Filter by Category" class="form-input w-1/3">
+                    <button id="coord-expense-filter-btn" class="btn-secondary">Filter</button>
+                    <button id="coord-expense-reset-btn" class="btn-secondary">Reset</button>
+                </div>
+                <div id="coordinator-expenses-list"></div>
+            </div>
+
+            <div id="coordinator-reports" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Limited Reports</h3>
+                <div class="space-y-6">
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-700 mb-2">Attendance Report</h4>
+                        <div id="report-coord-attendance"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-700 mb-2">Assignment Report</h4>
+                        <div id="report-coord-assignments"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-700 mb-2">Expense Report</h4>
+                        <div id="report-coord-expenses"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Admin Tab Content -->
+            <div id="admin-users" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">User Management</h3>
+                <form id="create-user-form" class="space-y-4 mb-6">
+                    <h4 class="text-lg font-medium text-gray-700">Create New User</h4>
+                    <div>
+                        <label for="new-user-name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" id="new-user-name" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="new-user-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="new-user-email" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="new-user-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <input type="password" id="new-user-password" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="new-user-role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <select id="new-user-role" class="form-input" required>
+                            <option value="">Select Role</option>
+                            <option value="volunteer">Volunteer</option>
+                            <option value="coordinator">Coordinator</option>
+                            <option value="admin">Admin</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="new-user-contact" class="block text-sm font-medium text-gray-700 mb-1">Contact</label>
+                        <input type="text" id="new-user-contact" class="form-input">
+                    </div>
+                    <button type="submit" class="btn-primary">Create User</button>
+                </form>
+                <div id="create-user-message" class="message-box hidden"></div>
+
+                <h4 class="text-lg font-medium text-gray-700 mb-4 mt-8">All Users</h4>
+                <div id="all-users-list"></div>
+            </div>
+
+            <div id="admin-tasks" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Task Management</h3>
+                <form id="create-task-form" class="space-y-4 mb-6">
+                    <h4 class="text-lg font-medium text-gray-700">Create New Task</h4>
+                    <div>
+                        <label for="new-task-title" class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                        <input type="text" id="new-task-title" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="new-task-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="new-task-description" class="form-input h-24" required></textarea>
+                    </div>
+                    <div>
+                        <label for="new-task-deadline" class="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
+                        <input type="date" id="new-task-deadline" class="form-input" required>
+                    </div>
+                    <div>
+                        <label for="new-task-priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                        <select id="new-task-priority" class="form-input" required>
+                            <option value="">Select Priority</option>
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="new-task-assign-to" class="block text-sm font-medium text-gray-700 mb-1">Assign To (Optional)</label>
+                        <select id="new-task-assign-to" class="form-input">
+                            <option value="">Leave Unassigned</option>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">Create Task</button>
+                </form>
+                <div id="create-task-message" class="message-box hidden"></div>
+
+                <h4 class="text-lg font-medium text-gray-700 mb-4 mt-8">All Tasks</h4>
+                <div class="flex space-x-4 mb-4">
+                    <select id="admin-task-status-filter" class="form-input w-1/3">
+                        <option value="">All Statuses</option>
+                        <option value="Pending">Pending</option>
+                        <option value="In Progress">In Progress</option>
+                        <option value="Completed">Completed</option>
+                    </select>
+                    <button id="admin-task-filter-btn" class="btn-secondary">Filter</button>
+                    <button id="admin-task-reset-btn" class="btn-secondary">Reset</button>
+                </div>
+                <div id="all-tasks-list"></div>
+            </div>
+
+            <div id="admin-attendance" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Attendance Tracking</h3>
+                <div class="flex space-x-4 mb-4">
+                    <input type="text" id="admin-attendance-volunteer-filter" placeholder="Filter by Volunteer ID" class="form-input w-1/3">
+                    <input type="date" id="admin-attendance-date-filter" class="form-input w-1/3">
+                    <button id="admin-attendance-filter-btn" class="btn-secondary">Filter</button>
+                    <button id="admin-attendance-reset-btn" class="btn-secondary">Reset</button>
+                </div>
+                <h4 class="text-lg font-medium text-gray-700 mb-2 mt-4">All Attendance Logs</h4>
+                <div id="admin-all-attendance-list"></div>
+
+                <h4 class="text-lg font-medium text-gray-700 mb-2 mt-8">Absentees Today</h4>
+                <button id="get-absentees-btn" class="btn-secondary mb-4">Refresh Absentees</button>
+                <div id="admin-absentees-list"></div>
+            </div>
+
+            <div id="admin-ratings" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Volunteer Ratings</h3>
+                <form id="admin-submit-rating-form" class="space-y-4 mb-6">
+                    <h4 class="text-lg font-medium text-gray-700">Submit Rating for Volunteer</h4>
+                    <div>
+                        <label for="admin-rating-volunteer-id" class="block text-sm font-medium text-gray-700 mb-1">Volunteer</label>
+                        <select id="admin-rating-volunteer-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="admin-rating-task-id" class="block text-sm font-medium text-gray-700 mb-1">Task</label>
+                        <select id="admin-rating-task-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="admin-rating-score" class="block text-sm font-medium text-gray-700 mb-1">Score (1-5)</label>
+                        <input type="number" id="admin-rating-score" class="form-input" min="1" max="5" required>
+                    </div>
+                    <div>
+                        <label for="admin-rating-comments" class="block text-sm font-medium text-gray-700 mb-1">Comments</label>
+                        <textarea id="admin-rating-comments" class="form-input h-24" required></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">Submit Rating</button>
+                </form>
+                <div id="admin-submit-rating-message" class="message-box hidden"></div>
+
+                <h4 class="text-lg font-medium text-gray-700 mb-4 mt-8">All Ratings</h4>
+                <div id="admin-all-ratings-list"></div>
+            </div>
+
+            <div id="admin-expenses" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Money Management</h3>
+                <form id="log-expense-form" class="space-y-4 mb-6">
+                    <h4 class="text-lg font-medium text-gray-700">Log New Expense</h4>
+                    <div>
+                        <label for="expense-task-id" class="block text-sm font-medium text-gray-700 mb-1">Task</label>
+                        <select id="expense-task-id" class="form-input" required>
+                            <!-- Options will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="expense-amount" class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                        <input type="number" id="expense-amount" class="form-input" step="0.01" required>
+                    </div>
+                    <div>
+                        <label for="expense-category" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                        <input type="text" id="expense-category" class="form-input" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Log Expense</button>
+                </form>
+                <div id="log-expense-message" class="message-box hidden"></div>
+
+                <h4 class="text-lg font-medium text-gray-700 mb-4 mt-8">All Expenses</h4>
+                <div class="flex space-x-4 mb-4">
+                    <input type="text" id="admin-expense-task-filter" placeholder="Filter by Task ID" class="form-input w-1/3">
+                    <input type="text" id="admin-expense-category-filter" placeholder="Filter by Category" class="form-input w-1/3">
+                    <button id="admin-expense-filter-btn" class="btn-secondary">Filter</button>
+                    <button id="admin-expense-reset-btn" class="btn-secondary">Reset</button>
+                </div>
+                <div id="admin-all-expenses-list"></div>
+            </div>
+
+            <div id="admin-reports" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Reporting & Insights</h3>
+                <div class="space-y-6">
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-700 mb-2">Task Summary</h4>
+                        <div id="report-admin-tasks"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-700 mb-2">Attendance Report</h4>
+                        <div id="report-admin-attendance"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-700 mb-2">Ratings Summary</h4>
+                        <div id="report-admin-ratings"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-700 mb-2">Expenses Report</h4>
+                        <div id="report-admin-expenses"></div>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-gray-700 mb-2">Assignment Logs</h4>
+                        <div id="report-admin-assignments"></div>
+                    </div>
+                </div>
+            </div>
+
+        </section>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
