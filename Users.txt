@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Volunteer One	
 volunteer1@example.com	
 password123	
@@ -9,3 +10,28 @@ password123
 Admin One	
 admin1@example.com	
 password123
+=======
+# Admin
+username: admin
+email: admin@vms.com
+password: admin123
+role: admin
+
+# Coordinator
+username: coord1
+email: coord1@vms.com
+password: coord123
+role: coordinator
+
+# Volunteer 1
+username: volunteer1
+email: vol1@vms.com
+password: vol123
+role: volunteer
+
+# Volunteer 2
+username: volunteer2
+email: vol2@vms.com
+password: vol123
+role: volunteer
+>>>>>>> 6b4434a61345d809f08f21c434419e79993c500e
