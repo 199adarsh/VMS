@@ -3,22 +3,491 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Volunteer Management System</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Volunteer Management System - Empowering Volunteers</title>
     <!-- Inter Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+    <!-- Tailwind CSS CDN (Included from index.html, placed before custom styles to allow overrides) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Base styles from test.html */
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
+            font-family: 'Inter', Arial, sans-serif;
+            background: #f8f9fb;
+            color: #222;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Main Content Wrapper */
+        .content-wrapper {
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Header */
+        .header {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px 16px; /* py-6 px-4 */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-logo {
+            font-size: 2rem; /* text-2xl */
+            font-weight: 700; /* font-bold */
+            color: #1f2937; /* text-gray-800 */
+        }
+
+        .nav-menu {
+            display: none; /* hidden */
+            align-items: center;
+            gap: 32px; /* space-x-8 */
+        }
+
+        .nav-menu a {
+            color: #4b5563; /* text-gray-600 */
+            font-weight: 500; /* font-medium */
+            transition: color 0.3s ease; /* transition duration-300 */
+        }
+
+        .nav-menu a:hover {
+            color: #111827; /* hover:text-gray-900 */
+        }
+
+        .btn-primary-cta {
+            background: linear-gradient(to right, #8b5cf6, #a78bfa); /* Purple gradient */
+            color: white;
+            padding: 12px 24px; /* px-6 py-3 */
+            border-radius: 10px; /* rounded-full */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+            font-weight: 600; /* font-semibold */
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(139, 92, 246, 0.4);
+        }
+
+        /* Mobile Menu Button (Hamburger) */
+        .mobile-menu-button {
+            display: block; /* md:hidden */
+            color: #4b5563; /* text-gray-600 */
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+        }
+        .mobile-menu-button svg {
+            width: 24px; /* w-6 */
+            height: 24px; /* h-6 */
+        }
+
+        /* Mobile Menu */
+        .mobile-menu {
+            display: none; /* hidden */
+            background-color: white;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+            padding: 16px 24px; /* py-4 px-6 */
+            position: absolute;
+            width: 100%;
+            z-index: 20;
+            top: 80px; /* Adjust based on header height */
+            left: 0;
+            text-align: center;
+        }
+
+        .mobile-menu ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px; /* space-y-4 */
+        }
+
+        .mobile-menu a, .mobile-menu button {
+            display: block;
+            color: #1f2937; /* text-gray-800 */
+            font-weight: 500; /* font-medium */
+            padding: 8px 0;
+            text-decoration: none;
+        }
+
+        .mobile-menu a:hover {
+            color: #9333ea; /* hover:text-purple-600 */
+        }
+
+        .mobile-menu .btn-primary-cta {
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        /* Hero Section */
+        .hero-section {
+            min-height: 100vh;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            padding: 0;
+            position: relative;
+            text-align: center;
+            overflow: hidden;
+        }
+        .hero-flex-center {
+            flex: 1 1 0%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+        @media (min-width: 768px) {
+            .hero-flex-center {
+                flex-direction: row;
+                justify-content: center;
+                align-items: center;
+                gap: 48px;
+            }
+        }
+
+        .hero-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px; /* px-4 */
+            position: relative;
+            z-index: 10;
+        }
+
+        .hero-heading {
+            font-size: 3rem; /* text-4xl */
+            line-height: 1.25; /* leading-tight */
+            font-weight: 800; /* font-extrabold */
+            color: #111827; /* text-gray-900 */
+            margin-bottom: 24px; /* mb-6 */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .hero-heading {
+                font-size: 4.5rem; /* md:text-6xl */
+            }
+        }
+
+        .hero-subheading {
+            font-size: 1.25rem; /* text-xl */
+            color: #374151; /* text-gray-700 */
+            margin-bottom: 16px; /* mb-4 */
+            max-width: 48rem; /* max-w-3xl */
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .hero-subheading {
+                font-size: 1.5rem; /* md:text-2xl */
+            }
+        }
+
+        .hero-description {
+            font-size: 1rem; /* text-base */
+            color: #4b5563; /* text-gray-600 */
+            margin-bottom: 32px; /* mb-8 */
+            max-width: 42rem; /* max-w-2xl */
+            margin-left: auto;
+            margin-right: auto;
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .hero-description {
+                font-size: 1.125rem; /* md:text-lg */
+            }
+        }
+
+        .hero-buttons {
+            display: flex;
+            flex-direction: column; /* flex-col */
+            justify-content: center;
+            gap: 16px; /* space-y-4 */
+            margin-bottom: 10px; /* mb-12 */
+        }
+        @media (min-width: 640px) { /* sm breakpoint */
+            .hero-buttons {
+                flex-direction: row; /* sm:flex-row */
+                gap: 16px; /* sm:space-x-4 */
+                margin-top: 0; /* sm:space-y-0 */
+            }
+        }
+
+        .hero-buttons .btn-primary-cta {
+            padding: 16px 32px; /* px-8 py-4 */
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 700; /* font-bold */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); /* shadow-xl */
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 2px solid #a78bfa;
+            color: #a78bfa;
+            padding: 16px 32px; /* px-8 py-4 */
+            border-radius: 10px; /* rounded-full */
+            font-weight: 700; /* font-bold */
+            font-size: 1.125rem; /* text-lg */
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .btn-secondary:hover {
+            background-color: #a78bfa;
+            color: white;
+            box-shadow: 0 4px 10px rgba(167, 139, 250, 0.4);
+        }
+
+        .hero-image-container {
+            position: relative;
+            z-index: 10;
+        }
+
+        .hero-image {
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); /* shadow-2xl */
+        }
+
+        /* Testimonial/Feature Section */
+        .testimonial-section {
+            min-height: 100vh;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: white;
+            padding: 0;
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .testimonial-section {
+                padding: 0px 0; /* md:py-24 */
+            }
+        }
+
+        .testimonial-content-wrapper {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px; /* px-4 */
+            display: flex;
+            flex-direction: column; /* flex-col */
+            align-items: center;
+            justify-content: center;
+            gap: 48px; /* gap-12 */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .testimonial-content-wrapper {
+                flex-direction: row; /* md:flex-row */
+            }
+        }
+
+        .testimonial-image-wrapper {
+            width: 200%; /* md:w-1/2 */
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* Align to top for better scrolling */
-            min-height: 100vh;
-            padding: 20px;
         }
-        .container {
+        @media (min-width: 768px) { /* md breakpoint */
+            .testimonial-image-wrapper {
+                width: 50%;
+            }
+        }
+
+        .testimonial-image {
+            max-width: 150%;
+            height: auto;
+            border-radius: 0.75rem; /* rounded-xl */
+
+        }
+
+        .testimonial-text-content {
+            width: 100%; /* md:w-1/2 */
+            text-align: center;
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .testimonial-text-content {
+                width: 50%;
+                text-align: left; /* md:text-left */
+            }
+        }
+
+        .testimonial-tag {
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 600; /* font-semibold */
+            color: #7209B7; /* text-gray-500 */
+            text-transform: uppercase; /* uppercase */
+            letter-spacing: 0.05em; /* tracking-wider */
+            margin-bottom: 8px; /* mb-2 */
+        }
+
+        .testimonial-heading {
+            font-size: 2rem; /* text-3xl */
+            font-weight: 800; /* font-extrabold */
+            color: #4361EE; /* text-gray-900 */
+            line-height: 1.25; /* leading-tight */
+            margin-bottom: 24px; /* mb-6 */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .testimonial-heading {
+                font-size: 2.25rem; /* md:text-4xl */
+            }
+        }
+
+        .testimonial-quote {
+            font-size: 1.125rem; /* text-lg */
+            color: #374151; /* text-gray-700 */
+            font-style: normal !important;
+            margin-bottom: 24px; /* mb-6 */
+        }
+
+        .testimonial-author {
+            font-weight: 600; /* font-semibold */
+            color: #1f2937; /* text-gray-800 */
+        }
+
+        .testimonial-role {
+            font-size: 0.875rem; /* text-sm */
+            color: #4b5563; /* text-gray-600 */
+            margin-bottom: 32px; /* mb-8 */
+        }
+
+        .case-study-link {
+            color: #9333ea; /* text-purple-600 */
+            font-weight: 600; /* font-semibold */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+        .case-study-link:hover {
+            color: #7e22ce; /* hover:text-purple-800 */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            .case-study-link {
+                justify-content: flex-start; /* md:justify-start */
+            }
+        }
+
+        .case-study-link svg {
+            width: 16px; /* w-4 */
+            height: 16px; /* h-4 */
+            margin-left: 8px; /* ml-2 */
+        }
+
+        .hero-img-vh {
+            height: 40vh;
+            width: auto;
+            max-width: 100vw;
+            margin-top: 18px;
+            border-radius: 18px;
+
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Features Section */
+        .features-section {
+            min-height: 100vh;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            background: #fff;
+            font-family: 'Inter', Arial, sans-serif;
+            padding: 0;
+        }
+        .features-header {
+            margin-top: 60px;
+            margin-bottom: 32px;
+            text-align: center;
+        }
+        .features-title {
+            font-size: 2.3rem;
+            font-weight: 700;
+            color: #4361EE;
+            margin-bottom: 10px;
+        }
+        .features-subtitle {
+            font-size: 1.08rem;
+            color: #444;
+            font-weight: 400;
+        }
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 0;
+            width: 90vw;
+            max-width: 1200px;
+            height: 60vh;
+            border-top: 1px solid #eee;
+            border-left: 1px solid #eee;
+            background: #fff;
+        }
+        .feature-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #eee;
+            border-bottom: 1px solid #eee;
+            padding: 32px 18px 18px 18px;
+            text-align: center;
+            background: #fff;
+        }
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 18px;
+            color: #111;
+        }
+        .feature-label {
+            font-size: 1.15rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #3A0CA3;
+        }
+        .feature-desc {
+            font-size: 1rem;
+            color: #444;
+            font-weight: 400;
+        }
+        @media (max-width: 900px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+                grid-template-rows: repeat(6, 1fr);
+                width: 98vw;
+                height: auto;
+            }
+        }
+
+        /* Styles for the integrated dashboard sections (adapted from index.html) */
+        /* These styles aim to blend with test.html's aesthetic */
+        .dashboard-main-section {
+            background-color: #f3f4f6; /* Light gray background for the dashboard area */
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
             background-color: #ffffff;
             border-radius: 12px;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
@@ -27,40 +496,513 @@
             padding: 32px;
             box-sizing: border-box;
         }
+
         .form-input {
-            @apply w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200;
+            width: 100%;
+            padding: 12px;
+            border: 1.5px solid #e0e7ff; /* Matching test.html's auth-input border */
+            border-radius: 10px; /* Matching test.html's auth-input border-radius */
+            outline: none;
+            background: #f8f9fb; /* Matching test.html's auth-input background */
+            color: #222;
+            box-shadow: 0 1px 2px rgba(67,97,238,0.03); /* Matching test.html's auth-input shadow */
+            transition: border 0.2s, box-shadow 0.2s;
         }
+        .form-input:focus {
+            border: 1.5px solid #4361EE; /* Matching test.html's auth-input focus */
+            box-shadow: 0 0 0 2px #4361ee22; /* Matching test.html's auth-input focus */
+            background: #fff;
+        }
+
         .btn-primary {
-            @apply bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition duration-200 shadow-md;
+            background: #4361EE; /* Matching test.html's auth-btn background */
+            color: #fff;
+            font-weight: 700;
+            font-size: 1.15rem;
+            border: none;
+            border-radius: 10px;
+            padding: 15px 24px; /* Adjusted padding for primary buttons */
+            margin-top: 10px;
+            cursor: pointer;
+            box-shadow: 0 2px 8px 0 rgba(67,97,238,0.08);
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+            width: 100%; /* Ensure primary buttons take full width */
         }
-        .btn-secondary {
-            @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition duration-200;
+        .btn-primary:hover {
+            background: #3A0CA3; /* Matching test.html's auth-btn hover */
+            color: #fff;
+            box-shadow: 0 4px 16px 0 rgba(67,97,238,0.12);
         }
+
+        /* Specific style for index.html's btn-secondary that doesn't conflict with test.html's .btn-secondary */
+        .btn-dashboard-secondary {
+            background-color: #e0e7ff; /* Lighter blue/gray for secondary actions */
+            color: #4361EE; /* Matching primary color for text */
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s, color 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-dashboard-secondary:hover {
+            background-color: #c7d2fe;
+            color: #3A0CA3;
+        }
+
         .tab-button {
-            @apply px-4 py-2 rounded-t-lg font-medium text-gray-600 hover:bg-gray-100 transition duration-200;
+            padding: 10px 16px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            font-weight: 500;
+            color: #4b5563;
+            transition: background-color 0.2s;
+            background-color: transparent;
+            border: none;
+            cursor: pointer;
         }
         .tab-button.active {
-            @apply bg-white border-b-2 border-blue-600 text-blue-600;
+            background-color: #ffffff;
+            border-bottom: 2px solid #4361EE; /* Matching primary color */
+            color: #4361EE;
         }
+
         .message-box {
-            @apply p-3 mt-4 rounded-lg text-sm;
+            padding: 12px;
+            margin-top: 16px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            text-align: center;
         }
         .message-box.success {
-            @apply bg-green-100 text-green-700 border border-green-200;
+            background-color: #d1fae5; /* Light green */
+            color: #065f46; /* Dark green */
+            border: 1px solid #a7f3d0;
         }
         .message-box.error {
-            @apply bg-red-100 text-red-700 border border-red-200;
+            background-color: #fee2e2; /* Light red */
+            color: #991b1b; /* Dark red */
+            border: 1px solid #fecaca;
         }
+
         .table-header th {
-            @apply px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid #e5e7eb;
         }
         .table-row td {
-            @apply px-4 py-3 whitespace-nowrap text-sm text-gray-800;
+            padding: 12px 16px;
+            white-space: nowrap;
+            font-size: 0.9rem;
+            color: #374151;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .table-row:last-child td {
+            border-bottom: none;
+        }
+
+
+        /* Callout Bar */
+        .callout-bar {
+            width: 100vw;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            padding: 32px 0 18px 0;
+            font-family: 'Inter', Arial, sans-serif;
+            border-bottom: 1px solid #eee;
+        }
+        .callout-emoji {
+            font-size: 1.3rem;
+            margin-right: 6px;
+        }
+        .callout-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #111;
+        }
+        .callout-btn {
+            background: #111;
+            color: #fff;
+            border: none;
+            border-radius: 22px;
+            padding: 10px 22px;
+            font-size: 1rem;
+            font-weight: 500;
+            margin-left: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+        .callout-btn:hover {
+            background: #222;
+        }
+
+        /* Footer */
+        .footer {
+            width: 100vw;
+            background: #fff;
+            border-top: 1px solid #eee;
+            font-family: 'Inter', Arial, sans-serif;
+            padding: 0;
+        }
+        .footer-main {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: flex-start;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 16px 32px 16px;
+            gap: 32px;
+        }
+        .footer-about {
+            flex: 2 1 300px;
+            min-width: 220px;
+            margin-bottom: 18px;
+        }
+        .footer-about-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #222;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .footer-about-desc {
+            font-size: 1rem;
+            color: #444;
+            margin-bottom: 18px;
+        }
+        .footer-socials {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+        }
+        .footer-socials a {
+            color: #222;
+            font-size: 1.2rem;
+            transition: color 0.2s;
+        }
+        .footer-socials a:hover {
+            color: #4361EE;
+        }
+        .footer-col {
+            flex: 1 1 160px;
+            min-width: 140px;
+            margin-bottom: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .footer-col-title {
+            font-size: 1.08rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #222;
+        }
+        .footer-col a {
+            color: #444;
+            text-decoration: none;
+            font-size: 1rem;
+            transition: color 0.2s;
+        }
+        .footer-col a:hover {
+            color: #4361EE;
+        }
+        @media (max-width: 900px) {
+            .footer-main {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 24px;
+            }
+        }
+
+        header, .navbar {
+            background: #3867f2;
+            color: #fff;
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .navbar a, .navbar button {
+            color: #222;
+            background: none;
+            border: none;
+            font-weight: 500;
+            margin-left: 2rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .navbar a:hover, .navbar button:hover {
+            color: #3867f2;
+        }
+
+        .btn-primary, .btn-dashboard-secondary {
+            background: #ff2d7a;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.7rem 1.5rem;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary:hover, .btn-dashboard-secondary:hover {
+            background: #e0266b;
+        }
+
+        .dashboard-card, .profile-card, .task-card, .team-card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(56,103,242,0.07);
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .stats-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+        }
+
+        .stats-header .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: #3867f2;
+        }
+
+        .stats-header .stats {
+            display: flex;
+            gap: 2.5rem;
+            align-items: center;
+        }
+
+        .stats-header .stats .stat {
+            text-align: center;
+        }
+
+        .stats-header .stats .stat .value {
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+
+        .stats-header .stats .stat .label {
+            font-size: 1rem;
+            color: #888;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.3em 1em;
+            border-radius: 999px;
+            font-size: 0.95em;
+            font-weight: 600;
+            margin-right: 0.5em;
+        }
+
+        .badge.completed { background: #e6fff2; color: #1abc9c; }
+        .badge.pending { background: #fffbe6; color: #f1c40f; }
+        .badge.incomplete { background: #ffeaea; color: #e74c3c; }
+        .badge.high { background: #ffeaea; color: #e74c3c; }
+        .badge.mid { background: #fffbe6; color: #f1c40f; }
+        .badge.low { background: #e6fff2; color: #1abc9c; }
+
+        .task-list, .team-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .task-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1.5rem 2rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 6px rgba(56,103,242,0.04);
+        }
+
+        .task-info {
+            flex: 2;
+        }
+
+        .task-meta {
+            flex: 1;
+            text-align: right;
+        }
+
+        .team-list {
+            display: flex;
+            gap: 2rem;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .team-card {
+            min-width: 220px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem 1.5rem;
+        }
+
+        .team-card .avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        input, select, textarea {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 0.7rem 1rem;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            width: 100%;
+            box-sizing: border-box;
+            background: #f8f9fb;
+            transition: border 0.2s;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: #3867f2;
+            outline: none;
+        }
+
+        @media (max-width: 900px) {
+            .stats-header, .task-list, .team-list {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .task-card, .team-card {
+                flex-direction: column;
+                align-items: flex-start;
+                text-align: left;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
-    <div class="container">
+<body>
+    <!-- Nav Bar -->
+    <header style="background: #4361EE; color: #fff; height: 70px; display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 100; font-family: 'Inter', Arial, sans-serif;">
+        <div style="font-size: 2rem; font-weight: 700; color: #000; margin-left: 32px; font-family: 'Inter', Arial, sans-serif;">VMS</div>
+        <nav style="display: flex; align-items: center; gap: 36px; margin-right: 32px; font-family: 'Inter', Arial, sans-serif;">
+            <a href="#" style="color: #000; font-weight: 500; font-size: 1.1rem; text-decoration: none; font-family: 'Inter', Arial, sans-serif;">Home</a>
+            <a href="#" style="color: #000; font-weight: 500; font-size: 1.1rem; text-decoration: none; font-family: 'Inter', Arial, sans-serif;">About</a>
+            <a href="#" style="color: #000; font-weight: 500; font-size: 1.1rem; text-decoration: none; font-family: 'Inter', Arial, sans-serif;">Contact</a>
+            <a href="#" style="color: #000; font-weight: 500; font-size: 1.1rem; text-decoration: none; font-family: 'Inter', Arial, sans-serif;">Pricing</a>
+            <button class="btn-primary-cta">Primary CTA</button>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section" style="background-image:url('{{ url_for('static', filename='IMG/bg.png') }}');">
+        <div style="width: 100%; max-width: 100%; margin: 0 auto; display: flex; flex-direction: column; align-items: center; position: relative; z-index: 2; padding-top: 10px; background-size: cover; background-position: center; background-repeat: no-repeat;">
+            <h1 style="color: #4361EE; font-size: 2.5rem; font-weight: 800; margin-bottom: 18px; margin-top: 30px; text-align: center;">Empowering Volunteers, Simplifying Impact</h1>
+            <div style="color: #222; font-size: 1.1rem; font-weight: 200; margin-bottom: 8px; text-align: center; max-width: 600px;">"It's never been easier to manage tasks, track attendance, and grow together all in one place."</div>
+            <img src="{{ url_for('static', filename='IMG/Hero.png') }}" alt="Volunteers Image" class="hero-img-vh" style="width: 61%; height: 100%;">
+        </div>
+    </section>
+
+    <!-- Testimonial/Feature Section -->
+    <section class="testimonial-section">
+        <div class="testimonial-content-wrapper">
+            <div class="testimonial-image-wrapper">
+                <!-- Placeholder for the testimonial image -->
+                <img src="{{ url_for('static', filename='IMG/testimonial.png') }}" alt="Volunteer with backpack and box" class="testimonial-image">
+            </div>
+            <div class="testimonial-text-content">
+                <p class="testimonial-tag">Real-time Coordination</p>
+                <h3 class="testimonial-heading">
+                    DSSA reduced task delays by 40% using our Volunteer Management System.
+                </h3>
+                <p class="testimonial-quote" style="font-size: 1.1rem; font-weight: 400; margin-bottom: 8px; text-align: start; max-width: 600px; margin-left: 0px; font-style: normal;">
+                    "Before this system, managing volunteers across multiple locations was overwhelming. Now, we assign tasks, track attendance, and view progress - all from one place. It's been a game-changer for our events."
+                </p>
+                <p class="testimonial-author">Sohal Dhavle</p>
+                <p class="testimonial-role">Vice President</p>
+                <a href="#" class="case-study-link">
+                    Read Full Case Study
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4m-4-4L20 4m0 0v5m0-5h5"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+        <div class="features-header">
+            <h2 class="features-title">Make every step volunteer-driven</h2>
+            <p class="features-subtitle">Manage, engage, and empower every user from volunteers to admins with ease.</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-item">
+                <i class="fa-solid fa-clipboard-check feature-icon" style="color: #CBD5E1;"></i>
+                <div class="feature-label">Task Assignment</div>
+                <div class="feature-desc">Assign tasks by priority, role, or availability. Track progress in real-time with zero confusion.</div>
+            </div>
+            <div class="feature-item">
+                <i class="fa-solid fa-users feature-icon" style="color: #CBD5E1;"></i>
+                <div class="feature-label">Attendance Tracking</div>
+                <div class="feature-desc">Monitor who showed up, when, and for which task no spreadsheets required.</div>
+            </div>
+            <div class="feature-item">
+                <i class="fa-solid fa-user-plus feature-icon" style="color: #CBD5E1;"></i>
+                <div class="feature-label">Volunteer Onboarding</div>
+                <div class="feature-desc">Smooth onboarding with guided steps, role-based access, and auto-notifications.</div>
+            </div>
+            <div class="feature-item">
+                <i class="fa-solid fa-comments feature-icon" style="color: #CBD5E1;"></i>
+                <div class="feature-label">Communication Hub</div>
+                <div class="feature-desc">Centralized updates, event alerts, and role-based messaging all in one place.</div>
+            </div>
+            <div class="feature-item">
+                <i class="fa-solid fa-thumbs-up feature-icon" style="color: #CBD5E1;"></i>
+                <div class="feature-label">Ratings & Feedback</div>
+                <div class="feature-desc">Collect and review performance-based ratings and feedback from coordinators and peers.</div>
+            </div>
+            <div class="feature-item">
+                <i class="fa-solid fa-chart-pie feature-icon" style="color: #CBD5E1;"></i>
+                <div class="feature-label">Reports & Insights</div>
+                <div class="feature-desc">Track hours, generate reports, and analyze volunteer impact with just a few clicks.</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Section (Integrated from index.html) -->
+    <section id="dashboard-main-section" class="dashboard-main-section">
+        <div class="dashboard-container">
         <h1 class="text-3xl font-bold text-center text-gray-800 mb-8">Volunteer Management System</h1>
 
         <!-- Login Section -->
@@ -83,8 +1025,8 @@
         <!-- Dashboard Section -->
         <section id="dashboard-section" class="hidden">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-semibold text-gray-700">Welcome, <span id="user-name"></span> (<span id="user-role"></span>)</h2>
-                <button id="logout-button" class="btn-secondary">Logout</button>
+                <h2 class="text-2xl font-semibold text-gray-700">Welcome, <span id="volunteer-name"></span> (<span id="volunteer-role"></span>)</h2>
+                    <button id="logout-button" class="btn-dashboard-secondary">Logout</button>
             </div>
 
             <!-- Tabs Navigation -->
@@ -208,8 +1150,8 @@
                 <div class="flex space-x-4 mb-4">
                     <input type="text" id="coord-attendance-volunteer-filter" placeholder="Filter by Volunteer ID" class="form-input w-1/3">
                     <input type="date" id="coord-attendance-date-filter" class="form-input w-1/3">
-                    <button id="coord-attendance-filter-btn" class="btn-secondary">Filter</button>
-                    <button id="coord-attendance-reset-btn" class="btn-secondary">Reset</button>
+                        <button id="coord-attendance-filter-btn" class="btn-dashboard-secondary">Filter</button>
+                        <button id="coord-attendance-reset-btn" class="btn-dashboard-secondary">Reset</button>
                 </div>
                 <div id="coordinator-attendance-list"></div>
             </div>
@@ -250,8 +1192,8 @@
                 <div class="flex space-x-4 mb-4">
                     <input type="text" id="coord-expense-task-filter" placeholder="Filter by Task ID" class="form-input w-1/3">
                     <input type="text" id="coord-expense-category-filter" placeholder="Filter by Category" class="form-input w-1/3">
-                    <button id="coord-expense-filter-btn" class="btn-secondary">Filter</button>
-                    <button id="coord-expense-reset-btn" class="btn-secondary">Reset</button>
+                        <button id="coord-expense-filter-btn" class="btn-dashboard-secondary">Filter</button>
+                        <button id="coord-expense-reset-btn" class="btn-dashboard-secondary">Reset</button>
                 </div>
                 <div id="coordinator-expenses-list"></div>
             </div>
@@ -356,8 +1298,8 @@
                         <option value="In Progress">In Progress</option>
                         <option value="Completed">Completed</option>
                     </select>
-                    <button id="admin-task-filter-btn" class="btn-secondary">Filter</button>
-                    <button id="admin-task-reset-btn" class="btn-secondary">Reset</button>
+                        <button id="admin-task-filter-btn" class="btn-dashboard-secondary">Filter</button>
+                        <button id="admin-task-reset-btn" class="btn-dashboard-secondary">Reset</button>
                 </div>
                 <div id="all-tasks-list"></div>
             </div>
@@ -367,14 +1309,14 @@
                 <div class="flex space-x-4 mb-4">
                     <input type="text" id="admin-attendance-volunteer-filter" placeholder="Filter by Volunteer ID" class="form-input w-1/3">
                     <input type="date" id="admin-attendance-date-filter" class="form-input w-1/3">
-                    <button id="admin-attendance-filter-btn" class="btn-secondary">Filter</button>
-                    <button id="admin-attendance-reset-btn" class="btn-secondary">Reset</button>
+                        <button id="admin-attendance-filter-btn" class="btn-dashboard-secondary">Filter</button>
+                        <button id="admin-attendance-reset-btn" class="btn-dashboard-secondary">Reset</button>
                 </div>
                 <h4 class="text-lg font-medium text-gray-700 mb-2 mt-4">All Attendance Logs</h4>
                 <div id="admin-all-attendance-list"></div>
 
                 <h4 class="text-lg font-medium text-gray-700 mb-2 mt-8">Absentees Today</h4>
-                <button id="get-absentees-btn" class="btn-secondary mb-4">Refresh Absentees</button>
+                    <button id="get-absentees-btn" class="btn-dashboard-secondary mb-4">Refresh Absentees</button>
                 <div id="admin-absentees-list"></div>
             </div>
 
@@ -436,8 +1378,8 @@
                 <div class="flex space-x-4 mb-4">
                     <input type="text" id="admin-expense-task-filter" placeholder="Filter by Task ID" class="form-input w-1/3">
                     <input type="text" id="admin-expense-category-filter" placeholder="Filter by Category" class="form-input w-1/3">
-                    <button id="admin-expense-filter-btn" class="btn-secondary">Filter</button>
-                    <button id="admin-expense-reset-btn" class="btn-secondary">Reset</button>
+                        <button id="admin-expense-filter-btn" class="btn-dashboard-secondary">Filter</button>
+                        <button id="admin-expense-reset-btn" class="btn-dashboard-secondary">Reset</button>
                 </div>
                 <div id="admin-all-expenses-list"></div>
             </div>
@@ -470,8 +1412,53 @@
 
         </section>
     </div>
+    </section>
 
-    <!-- JavaScript -->
+    <!-- Callout Bar -->
+    <div class="callout-bar">
+        <span class="callout-emoji">✨</span>
+        <span class="callout-text">Learn how to build a thriving volunteer community with VMS</span>
+        <button class="callout-btn"><i class="fa-solid fa-download"></i> Download Free Guide</button>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-main">
+            <div class="footer-about">
+                <div class="footer-about-title"><i class="fa-solid fa-info-circle"></i> About VMS</div>
+                <div class="footer-about-desc">VMS is a modern volunteer management system built to simplify task assignments, track attendance, and empower community teams with powerful tools.</div>
+                <div class="footer-socials">
+                    <a href="#"><i class="fa-brands fa-twitter"></i></a>
+                    <a href="#"><i class="fa-brands fa-facebook"></i></a>
+                    <a href="#"><i class="fa-brands fa-instagram"></i></a>
+                    <a href="#"><i class="fa-brands fa-github"></i></a>
+                </div>
+            </div>
+            <div class="footer-col">
+                <div class="footer-col-title">Company</div>
+                <a href="#">About</a>
+                <a href="#">Features</a>
+                <a href="#">Works</a>
+                <a href="#">Career</a>
+            </div>
+            <div class="footer-col">
+                <div class="footer-col-title">Help</div>
+                <a href="#">Customer Support</a>
+                <a href="#">Delivery Details</a>
+                <a href="#">Terms & Conditions</a>
+                <a href="#">Privacy Policy</a>
+            </div>
+            <div class="footer-col">
+                <div class="footer-col-title">Resources</div>
+                <a href="#">Free eBooks</a>
+                <a href="#">Development Tutorial</a>
+                <a href="#">How to – Blog</a>
+                <a href="#">Youtube Playlist</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Script for index.html functionality -->
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>

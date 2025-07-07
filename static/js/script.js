@@ -196,6 +196,11 @@ async function loadUserProfile() {
  * Logs out the user and resets the UI.
  */
 function logout() {
+    // Stop dashboard auto-refresh when logging out
+    if (dashboardAutoRefreshInterval) {
+        clearInterval(dashboardAutoRefreshInterval);
+        dashboardAutoRefreshInterval = null;
+    }
     loginSection.classList.remove('hidden');
     dashboardSection.classList.add('hidden');
     tabContents.forEach(content => content.classList.add('hidden'));
@@ -300,10 +305,9 @@ function setupAdminTabs() {
     }
 }
 
-/**
- * Shows a specific tab and hides others.
- * @param {string} tabId The ID of the tab to show.
- */
+let dashboardAutoRefreshInterval = null;
+let currentDashboardTab = null;
+
 function showTab(tabId) {
     // Update tab buttons
     const tabButtons = dashboardTabs.querySelectorAll('.tab-button');
@@ -326,8 +330,20 @@ function showTab(tabId) {
         activeButton.classList.add('active');
     }
 
+    // Clear previous interval if switching tabs
+    if (dashboardAutoRefreshInterval) {
+        clearInterval(dashboardAutoRefreshInterval);
+        dashboardAutoRefreshInterval = null;
+    }
+    currentDashboardTab = tabId;
     // Load data for the selected tab
     loadTabData(tabId);
+    // Set up auto-refresh for all dashboard tabs
+    if (tabId.startsWith('volunteer-') || tabId.startsWith('coordinator-') || tabId.startsWith('admin-')) {
+        dashboardAutoRefreshInterval = setInterval(() => {
+            loadTabData(tabId);
+        }, 5000); // 5 seconds
+    }
 }
 
 /**
@@ -339,6 +355,7 @@ async function loadTabData(tabId) {
         if (tabId === 'volunteer-assigned-tasks') {
             await fetchAssignedTasks();
         } else if (tabId === 'volunteer-attendance') {
+            await populateAttendanceTaskSelect();
             await fetchMyAttendance();
         } else if (tabId === 'volunteer-ratings') {
             await fetchMyRatings();
@@ -1660,6 +1677,30 @@ async function fetchAdminReports() {
     }
 }
 
+async function populateAttendanceTaskSelect() {
+    try {
+        const tasks = await apiRequest('/tasks/assigned', 'GET');
+        attendanceTaskIdSelect.innerHTML = '<option value="">Select a Task</option>';
+        tasks.forEach(task => {
+            if (task.status !== 'Completed') { // Only allow attendance for incomplete tasks
+                const option = document.createElement('option');
+                option.value = task.task_id;
+                option.textContent = `${task.title} (${task.deadline})`;
+                attendanceTaskIdSelect.appendChild(option);
+            }
+        });
+    } catch (error) {
+        attendanceTaskIdSelect.innerHTML = '<option value="">Error loading tasks</option>';
+    }
+}
+
+async function loadVolunteerDashboard() {
+    const data = await apiRequest('/dashboard/volunteer', 'GET');
+    document.getElementById('volunteer-name').textContent = data.name;
+    document.getElementById('volunteer-attendance').textContent = data.attendance_percent + '%';
+    document.getElementById('volunteer-rating').textContent = data.average_rating;
+    // Render tasks and team as needed
+}
 
 // --- Initial Load ---
 document.addEventListener('DOMContentLoaded', async () => {

@@ -67,6 +67,10 @@ def role_required(allowed_roles):
 def index():
     return render_template('index.html')
 
+@app.route('/home')
+def home():
+    return render_template('index.html')
+
 @app.route('/coordinator/dashboard')
 @role_required(['coordinator'])
 def coordinator_dashboard():
@@ -539,12 +543,15 @@ def admin_assign_task():
     return jsonify({"message": "Task assigned successfully by admin", "task": task}), 200
 
 @app.route('/tasks', methods=['GET'])
-@role_required(['admin'])
-def get_all_tasks():
+@role_required(['coordinator'])
+def coordinator_get_all_tasks():
     status_filter = request.args.get('status')
-    all_tasks = list(tasks.values())
+    all_tasks = []
+    for task_id, task in tasks.items():
+        task_info = {"task_id": task_id, **task}
+        all_tasks.append(task_info)
     if status_filter:
-        all_tasks = [task for task in all_tasks if task.get('status').lower() == status_filter.lower()]
+        all_tasks = [task for task in all_tasks if task.get('status', '').lower() == status_filter.lower()]
     return jsonify(all_tasks), 200
 
 @app.route('/tasks/<task_id>', methods=['PUT'])
@@ -678,6 +685,138 @@ def admin_report_ratings():
         data['volunteer_name'] = users.get(vol_id, {}).get('name', 'Unknown')
 
     return jsonify(rating_summary), 200
+
+@app.route('/register', methods=['POST'])
+def register_volunteer():
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    name = data.get('name')
+    contact = data.get('contact')
+
+    if not all([email, password, name]):
+        return jsonify({"message": "Missing required fields"}), 400
+
+    # Check if email already exists
+    if any(u['email'] == email for u in users.values()):
+        return jsonify({"message": "User with this email already exists"}), 409
+
+    new_user_id = f"v{uuid.uuid4().hex[:8]}"
+    users[new_user_id] = {
+        "email": email,
+        "password": password,  # In a real app, hash and salt this!
+        "role": "volunteer",
+        "user_id": new_user_id,
+        "name": name,
+        "contact": contact
+    }
+    return jsonify({"message": "Volunteer registered successfully", "user_id": new_user_id}), 201
+
+@app.route('/dashboard/volunteer', methods=['GET'])
+@role_required(['volunteer'])
+def volunteer_dashboard_summary():
+    current_user_id = session['user_id']
+    user = users.get(current_user_id)
+    # Attendance %
+    total_tasks = len([t for t in tasks.values() if t.get('assigned_to') == current_user_id])
+    attended = len([log for log in attendance_logs if log.get('user_id') == current_user_id])
+    attendance_percent = int((attended / total_tasks) * 100) if total_tasks else 0
+    # Average rating
+    my_ratings = [r for r in ratings if r.get('volunteer_id') == current_user_id]
+    avg_rating = round(sum(r['score'] for r in my_ratings) / len(my_ratings), 2) if my_ratings else 0
+    # Tasks
+    my_tasks = []
+    for task_id, t in tasks.items():
+        if t.get('assigned_to') == current_user_id:
+            task_info = {"task_id": task_id, **t}
+            # Attach rating if exists
+            task_ratings = [r for r in my_ratings if r['task_id'] == task_id]
+            task_info['rating'] = task_ratings[0]['score'] if task_ratings else None
+            my_tasks.append(task_info)
+    # Team (other volunteers, fake for now)
+    team = [
+        {"name": "Jane Cooper", "email": "jgraham@example.com", "location": "Toledo", "amount": 10483},
+        {"name": "Devon Lane", "email": "dat.roberts@example.com", "location": "New York", "amount": 11159},
+        {"name": "curtis_d@example.com", "location": "Naperville", "amount": 9084}
+    ]
+    return jsonify({
+        "name": user['name'],
+        "attendance_percent": attendance_percent,
+        "average_rating": avg_rating,
+        "tasks": my_tasks,
+        "team": team
+    })
+
+@app.route('/dashboard/coordinator', methods=['GET'])
+@role_required(['coordinator'])
+def coordinator_dashboard_summary():
+    current_user_id = session['user_id']
+    user = users.get(current_user_id)
+    # Volunteers managed (all volunteers for now)
+    volunteer_ids = [uid for uid, u in users.items() if u['role'] == 'volunteer']
+    # Attendance % (average of their volunteers)
+    attendance_percents = []
+    for vid in volunteer_ids:
+        total_tasks = len([t for t in tasks.values() if t.get('assigned_to') == vid])
+        attended = len([log for log in attendance_logs if log.get('user_id') == vid])
+        percent = int((attended / total_tasks) * 100) if total_tasks else 0
+        attendance_percents.append(percent)
+    avg_attendance = int(sum(attendance_percents) / len(attendance_percents)) if attendance_percents else 0
+    # Average rating (of their volunteers)
+    volunteer_ratings = [r for r in ratings if r.get('volunteer_id') in volunteer_ids]
+    avg_rating = round(sum(r['score'] for r in volunteer_ratings) / len(volunteer_ratings), 2) if volunteer_ratings else 0
+    # Tasks assigned
+    assigned_tasks = []
+    for task_id, t in tasks.items():
+        if t.get('assigned_to') in volunteer_ids:
+            task_info = {"task_id": task_id, **t}
+            # Attach rating if exists
+            task_ratings = [r for r in ratings if r['volunteer_id'] == t['assigned_to'] and r['task_id'] == task_id]
+            task_info['rating'] = task_ratings[0]['score'] if task_ratings else None
+            assigned_tasks.append(task_info)
+    # Team (volunteers)
+    team = [{"name": users[vid]['name'], "email": users[vid]['email'], "location": "", "amount": 0} for vid in volunteer_ids]
+    return jsonify({
+        "name": user['name'],
+        "attendance_percent": avg_attendance,
+        "average_rating": avg_rating,
+        "tasks": assigned_tasks,
+        "team": team
+    })
+
+@app.route('/dashboard/admin', methods=['GET'])
+@role_required(['admin'])
+def admin_dashboard_summary():
+    user = users.get(session['user_id'])
+    # Attendance % (average of all volunteers)
+    volunteer_ids = [uid for uid, u in users.items() if u['role'] == 'volunteer']
+    attendance_percents = []
+    for vid in volunteer_ids:
+        total_tasks = len([t for t in tasks.values() if t.get('assigned_to') == vid])
+        attended = len([log for log in attendance_logs if log.get('user_id') == vid])
+        percent = int((attended / total_tasks) * 100) if total_tasks else 0
+        attendance_percents.append(percent)
+    avg_attendance = int(sum(attendance_percents) / len(attendance_percents)) if attendance_percents else 0
+    # Average rating (all volunteers)
+    volunteer_ratings = [r for r in ratings if r.get('volunteer_id') in volunteer_ids]
+    avg_rating = round(sum(r['score'] for r in volunteer_ratings) / len(volunteer_ratings), 2) if volunteer_ratings else 0
+    # All tasks
+    all_tasks = []
+    for task_id, t in tasks.items():
+        task_info = {"task_id": task_id, **t}
+        # Attach rating if exists
+        task_ratings = [r for r in ratings if r['volunteer_id'] == t.get('assigned_to') and r['task_id'] == task_id]
+        task_info['rating'] = task_ratings[0]['score'] if task_ratings else None
+        all_tasks.append(task_info)
+    # Team (all users)
+    team = [{"name": u['name'], "email": u['email'], "location": "", "amount": 0} for uid, u in users.items()]
+    return jsonify({
+        "name": user['name'],
+        "attendance_percent": avg_attendance,
+        "average_rating": avg_rating,
+        "tasks": all_tasks,
+        "team": team
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
