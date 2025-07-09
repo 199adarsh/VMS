@@ -500,7 +500,7 @@ def delete_user(user_id):
     return jsonify({"message": "User not found"}), 404
 
 @app.route('/tasks/create', methods=['POST'])
-@role_required(['admin'])
+@role_required(['admin', 'coordinator'])
 def create_task():
     data = request.get_json()
     title = data.get('title')
@@ -603,7 +603,7 @@ def delete_rating(rating_id):
     return jsonify({"message": "Rating not found"}), 404
 
 @app.route('/expenses/log', methods=['POST'])
-@role_required(['admin'])
+@role_required(['admin', 'coordinator'])
 def log_expense():
     data = request.get_json()
     task_id = data.get('task_id')

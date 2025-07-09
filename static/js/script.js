@@ -261,7 +261,8 @@ function setupCoordinatorTabs() {
         { id: 'coordinator-attendance', label: 'Attendance' },
         { id: 'coordinator-ratings', label: 'Ratings' },
         { id: 'coordinator-expenses', label: 'Expenses' },
-        { id: 'coordinator-reports', label: 'Reports' }
+        { id: 'coordinator-reports', label: 'Reports' },
+        { id: 'tasks-tab', label: 'Tasks' }
     ];
 
     tabs.forEach(tab => {
@@ -284,7 +285,7 @@ function setupCoordinatorTabs() {
 function setupAdminTabs() {
     const tabs = [
         { id: 'admin-users', label: 'Users' },
-        { id: 'admin-tasks', label: 'Tasks' },
+        { id: 'tasks-tab', label: 'Tasks' },
         { id: 'admin-attendance', label: 'Attendance' },
         { id: 'admin-ratings', label: 'Ratings' },
         { id: 'admin-expenses', label: 'Expenses' },
@@ -339,11 +340,9 @@ function showTab(tabId) {
     // Load data for the selected tab
     loadTabData(tabId);
     // Set up auto-refresh for all dashboard tabs
-    if (tabId.startsWith('volunteer-') || tabId.startsWith('coordinator-') || tabId.startsWith('admin-')) {
-        dashboardAutoRefreshInterval = setInterval(() => {
-            loadTabData(tabId);
-        }, 5000); // 5 seconds
-    }
+    // dashboardAutoRefreshInterval = setInterval(() => {
+    //     loadTabData(tabId);
+    // }, 5000); // 5 seconds
 }
 
 /**
@@ -373,10 +372,10 @@ async function loadTabData(tabId) {
             await fetchCoordinatorExpenses();
         } else if (tabId === 'coordinator-reports') {
             await fetchCoordinatorReports();
+        } else if (tabId === 'tasks-tab') {
+            await fetchAllTasks();
         } else if (tabId === 'admin-users') {
             await fetchAllUsers();
-        } else if (tabId === 'admin-tasks') {
-            await fetchAllTasks();
         } else if (tabId === 'admin-attendance') {
             await fetchAdminAttendance();
         } else if (tabId === 'admin-ratings') {
@@ -1051,46 +1050,39 @@ async function fetchAllUsers() {
             allUsersList.innerHTML = '<p class="text-gray-600">No users found.</p>';
             return;
         }
-        const table = document.createElement('table');
-        table.className = 'min-w-full divide-y divide-gray-200 rounded-lg overflow-hidden shadow-sm';
-        table.innerHTML = `
-            <thead class="bg-gray-100">
-                <tr class="table-header">
-                    <th>ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Contact</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-            </tbody>
-        `;
-        const tbody = table.querySelector('tbody');
         users.forEach(user => {
-            const row = tbody.insertRow();
-            row.className = 'table-row';
-            row.insertCell().textContent = user.user_id;
-            row.insertCell().textContent = user.name;
-            row.insertCell().textContent = user.email;
-            row.insertCell().textContent = user.role;
-            row.insertCell().textContent = user.contact || 'N/A';
-            const actionsCell = row.insertCell();
-
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Edit';
-            editButton.className = 'btn-secondary text-xs mr-2';
-            editButton.onclick = () => openEditUserModal(user);
-            actionsCell.appendChild(editButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Delete';
-            deleteButton.className = 'bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 text-xs';
-            deleteButton.onclick = () => deleteUser(user.user_id);
-            actionsCell.appendChild(deleteButton);
+            let roleIcon = '';
+            let roleColor = '';
+            if (user.role === 'admin') {
+                roleIcon = '<i class="fa-solid fa-shield-halved text-purple-600"></i>';
+                roleColor = 'bg-purple-50 border-purple-300';
+            } else if (user.role === 'coordinator') {
+                roleIcon = '<i class="fa-solid fa-briefcase text-blue-600"></i>';
+                roleColor = 'bg-blue-50 border-blue-300';
+            } else {
+                roleIcon = '<i class="fa-solid fa-user-group text-green-600"></i>';
+                roleColor = 'bg-green-50 border-green-300';
+            }
+            const card = document.createElement('div');
+            card.className = `transition-transform duration-200 hover:scale-105 shadow-md border rounded-xl p-5 mb-4 flex flex-col gap-2 ${roleColor}`;
+            card.innerHTML = `
+                <div class="flex items-center gap-2 mb-2">
+                    ${roleIcon}
+                    <span class="text-lg font-bold text-gray-800">${user.name}</span>
+                    <span class="ml-auto inline-block px-2 py-1 text-xs font-semibold rounded ${user.role === 'admin' ? 'bg-purple-100 text-purple-700' : user.role === 'coordinator' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}">${user.role.charAt(0).toUpperCase() + user.role.slice(1)}</span>
+                </div>
+                <div class="text-gray-600 text-sm mb-2"><i class="fa-solid fa-envelope"></i> ${user.email}</div>
+                <div class="flex items-center gap-4 text-xs text-gray-500">
+                    <span><i class="fa-solid fa-phone"></i> ${user.contact || 'N/A'}</span>
+                    <span><i class="fa-solid fa-id-badge"></i> ID: ${user.user_id}</span>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button class="btn-dashboard-secondary text-xs" onclick="openEditUserModal(${JSON.stringify(user).replace(/"/g, '&quot;')})"><i class="fa-solid fa-pen"></i> Edit</button>
+                    <button class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 text-xs" onclick="deleteUser('${user.user_id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+                </div>
+            `;
+            allUsersList.appendChild(card);
         });
-        allUsersList.appendChild(table);
     } catch (error) {
         allUsersList.innerHTML = `<p class="text-red-600">Error loading users: ${error.message}</p>`;
     }
@@ -1187,50 +1179,49 @@ async function fetchAllTasks() {
             allTasksList.innerHTML = '<p class="text-gray-600">No tasks found.</p>';
             return;
         }
-        const table = document.createElement('table');
-        table.className = 'min-w-full divide-y divide-gray-200 rounded-lg overflow-hidden shadow-sm';
-        table.innerHTML = `
-            <thead class="bg-gray-100">
-                <tr class="table-header">
-                    <th>ID</th>
-                    <th>Title</th>
-                    <th>Description</th>
-                    <th>Deadline</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Assigned To</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody class="bg-white divide-y divide-gray-200">
-            </tbody>
-        `;
-        const tbody = table.querySelector('tbody');
+        // Card-based rendering
         tasks.forEach(task => {
-            const row = tbody.insertRow();
-            row.className = 'table-row';
-            row.insertCell().textContent = task.task_id;
-            row.insertCell().textContent = task.title;
-            row.insertCell().textContent = task.description;
-            row.insertCell().textContent = task.deadline;
-            row.insertCell().textContent = task.priority;
-            row.insertCell().textContent = task.status;
-            row.insertCell().textContent = task.assigned_to || 'None';
-            const actionsCell = row.insertCell();
-
-            const editButton = document.createElement('button');
-            editButton.textContent = 'Edit';
-            editButton.className = 'btn-secondary text-xs mr-2';
-            editButton.onclick = () => openEditTaskModal(task);
-            actionsCell.appendChild(editButton);
-
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Delete';
-            deleteButton.className = 'bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 text-xs';
-            deleteButton.onclick = () => deleteTask(task.task_id);
-            actionsCell.appendChild(deleteButton);
+            let priorityIcon = '';
+            let priorityColor = '';
+            if (task.priority === 'High') {
+                priorityIcon = '<i class="fa-solid fa-bolt text-red-500"></i>';
+                priorityColor = 'bg-red-50 border-red-300';
+            } else if (task.priority === 'Medium') {
+                priorityIcon = '<i class="fa-solid fa-arrow-up text-yellow-500"></i>';
+                priorityColor = 'bg-yellow-50 border-yellow-300';
+            } else {
+                priorityIcon = '<i class="fa-solid fa-arrow-down text-green-500"></i>';
+                priorityColor = 'bg-green-50 border-green-300';
+            }
+            let statusBadge = '';
+            if (task.status === 'Completed') {
+                statusBadge = '<span class="inline-block px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700">Completed</span>';
+            } else if (task.status === 'In Progress') {
+                statusBadge = '<span class="inline-block px-2 py-1 text-xs font-semibold rounded bg-yellow-100 text-yellow-700">In Progress</span>';
+            } else {
+                statusBadge = '<span class="inline-block px-2 py-1 text-xs font-semibold rounded bg-gray-200 text-gray-700">Pending</span>';
+            }
+            const card = document.createElement('div');
+            card.className = `transition-transform duration-200 hover:scale-105 shadow-md border rounded-xl p-5 mb-4 flex flex-col gap-2 ${priorityColor}`;
+            card.innerHTML = `
+                <div class="flex items-center gap-2 mb-2">
+                    ${priorityIcon}
+                    <span class="text-lg font-bold text-gray-800">${task.title}</span>
+                    <span class="ml-auto">${statusBadge}</span>
+                </div>
+                <div class="text-gray-600 text-sm mb-2">${task.description}</div>
+                <div class="flex items-center gap-4 text-xs text-gray-500">
+                    <span><i class="fa-regular fa-calendar"></i> <b>Deadline:</b> ${task.deadline}</span>
+                    <span><i class="fa-solid fa-user"></i> <b>Assigned:</b> ${task.assigned_to || 'None'}</span>
+                    <span><i class="fa-solid fa-layer-group"></i> <b>Priority:</b> ${task.priority}</span>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button class="btn-dashboard-secondary text-xs" onclick="openEditTaskModal(${JSON.stringify(task).replace(/"/g, '&quot;')})"><i class="fa-solid fa-pen"></i> Edit</button>
+                    <button class="bg-red-500 text-white px-3 py-1 rounded-md hover:bg-red-600 text-xs" onclick="deleteTask('${task.task_id}')"><i class="fa-solid fa-trash"></i> Delete</button>
+                </div>
+            `;
+            allTasksList.appendChild(card);
         });
-        allTasksList.appendChild(table);
     } catch (error) {
         allTasksList.innerHTML = `<p class="text-red-600">Error loading tasks: ${error.message}</p>`;
     }
@@ -1728,4 +1719,107 @@ window.deleteRating = deleteRating;
 window.openEditExpenseModal = openEditExpenseModal;
 window.updateExpense = updateExpense;
 window.deleteExpense = deleteExpense;
+
+// === DASHBOARD WIDGETS LOGIC ===
+async function updateDashboardWidgets() {
+  try {
+    // Fetch dashboard summary (role-based)
+    let summary = {};
+    let role = window.sessionRole || 'admin'; // fallback
+    if (!role && window.sessionStorage) role = sessionStorage.getItem('role');
+    let url = '/dashboard/admin';
+    if (role === 'coordinator') url = '/dashboard/coordinator';
+    if (role === 'volunteer') url = '/dashboard/volunteer';
+    const res = await fetch(url, { credentials: 'include' });
+    if (res.ok) summary = await res.json();
+    // Tasks
+    document.getElementById('dashboard-tasks-count').textContent = summary.tasks ? summary.tasks.length : (summary.total_tasks || '--');
+    // Attendance
+    document.getElementById('dashboard-attendance-rate').textContent = (summary.attendance_percent !== undefined) ? summary.attendance_percent + '%' : '--%';
+    // Ratings
+    document.getElementById('dashboard-average-rating').textContent = summary.average_rating !== undefined ? summary.average_rating : '--';
+    // Expenses
+    document.getElementById('dashboard-expenses-total').textContent = summary.expenses_total !== undefined ? ('$' + summary.expenses_total) : '--';
+    // Reports (dummy: count of tasks+attendance+ratings+expenses)
+    let reportsCount = 0;
+    if (summary.tasks) reportsCount += summary.tasks.length;
+    if (summary.attendance_percent) reportsCount += 1;
+    if (summary.average_rating) reportsCount += 1;
+    if (summary.expenses_total) reportsCount += 1;
+    document.getElementById('dashboard-reports-count').textContent = reportsCount || '--';
+    // Volunteers
+    document.getElementById('dashboard-volunteers-count').textContent = summary.team ? summary.team.length : '--';
+    // Welcome message
+    if (summary.name) document.getElementById('volunteer-name').textContent = summary.name;
+    if (role) document.getElementById('volunteer-role').textContent = '(' + role.charAt(0).toUpperCase() + role.slice(1) + ')';
+  } catch (e) {
+    // fallback to --
+  }
+}
+
+// Notifications and Activity (dummy for now, can be wired to backend)
+function updateDashboardNotifications() {
+  const notifications = [
+    { msg: 'Task "Cleanup Drive" marked as completed.', time: '2m ago' },
+    { msg: 'New volunteer registered.', time: '10m ago' },
+    { msg: 'Expense report submitted.', time: '1h ago' }
+  ];
+  const notifList = document.getElementById('dashboard-notifications-list');
+  notifList.innerHTML = '';
+  notifications.forEach(n => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class='font-semibold text-gray-700'>${n.msg}</span> <span class='text-xs text-gray-400 ml-2'>${n.time}</span>`;
+    notifList.appendChild(li);
+  });
+}
+function updateDashboardActivity() {
+  const activity = [
+    { msg: 'Attendance marked for "Food Distribution".', time: 'Today' },
+    { msg: 'Rating submitted for Volunteer One.', time: 'Yesterday' },
+    { msg: 'Task "Event Setup" assigned.', time: '2 days ago' }
+  ];
+  const actList = document.getElementById('dashboard-activity-list');
+  actList.innerHTML = '';
+  activity.forEach(a => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class='font-semibold text-gray-700'>${a.msg}</span> <span class='text-xs text-gray-400 ml-2'>${a.time}</span>`;
+    actList.appendChild(li);
+  });
+}
+
+// Quick action buttons
+function setupDashboardQuickActions() {
+  const showTab = window.showTab || function(id) { document.getElementById(id).classList.remove('hidden'); };
+  document.getElementById('dashboard-add-task-btn').onclick = () => showTab('admin-tasks');
+  document.getElementById('dashboard-mark-attendance-btn').onclick = () => showTab('admin-attendance');
+  document.getElementById('dashboard-add-rating-btn').onclick = () => showTab('admin-ratings');
+  document.getElementById('dashboard-add-expense-btn').onclick = () => showTab('admin-expenses');
+  document.getElementById('dashboard-view-reports-btn').onclick = () => showTab('admin-reports');
+  document.getElementById('dashboard-view-volunteers-btn').onclick = () => showTab('admin-users');
+}
+
+// Unified search (dashboard only)
+document.getElementById('dashboard-search').addEventListener('input', function(e) {
+  // Implement search/filter logic across dashboard widgets if needed
+});
+
+// Theme toggle (dashboard only)
+document.getElementById('dashboard-theme-toggle').onclick = function() {
+  document.getElementById('dashboard-section').classList.toggle('dark');
+};
+
+// Auto-refresh every 30s
+setInterval(() => {
+  updateDashboardWidgets();
+  updateDashboardNotifications();
+  updateDashboardActivity();
+}, 30000);
+
+// Initial load
+if (document.getElementById('dashboard-section')) {
+  updateDashboardWidgets();
+  updateDashboardNotifications();
+  updateDashboardActivity();
+  setupDashboardQuickActions();
+}
 
