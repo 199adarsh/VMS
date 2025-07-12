@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
     <!-- Tailwind CSS CDN (Included from index.html, placed before custom styles to allow overrides) -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Bricolage Grotesque Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         /* Base styles from test.html */
         body {
@@ -909,9 +911,668 @@
                 text-align: left;
             }
         }
+        /* Dashboard minimalist redesign */
+        .dashboard-container, .tab-content, .card-panel, .bg-gray-50, .bg-white, .shadow-lg, .rounded-xl, .rounded-lg {
+            font-family: 'Bricolage Grotesque', 'Inter', Arial, sans-serif !important;
+            background: #fff !important;
+            border-radius: 18px !important;
+            box-shadow: 0 2px 12px rgba(16,30,54,0.04);
+            border: 1px solid #F1F2F4;
+        }
+        .dashboard-container {
+            padding: 40px 24px !important;
+            margin: 0 auto;
+            max-width: 1100px;
+        }
+        .tab-content {
+            margin-bottom: 32px;
+            padding: 32px 24px !important;
+        }
+        .dashboard-container h1, .tab-content h2, .tab-content h3, .tab-content h4 {
+            font-family: 'Bricolage Grotesque', 'Inter', Arial, sans-serif !important;
+            color: #111827;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+        }
+        .dashboard-container label, .tab-content label {
+            font-family: 'Bricolage Grotesque', 'Inter', Arial, sans-serif !important;
+            color: #6B7280;
+            font-weight: 500;
+            font-size: 1rem;
+        }
+        .form-input, .tab-content input, .tab-content select, .tab-content textarea {
+            font-family: 'Bricolage Grotesque', 'Inter', Arial, sans-serif !important;
+            border-radius: 14px !important;
+            border: 1.5px solid #E5E7EB !important;
+            background: #F9FAFB !important;
+            color: #111827 !important;
+            font-size: 1.08rem;
+            padding: 14px 16px !important;
+            box-shadow: none !important;
+            transition: border 0.2s, background 0.2s;
+        }
+        .form-input:focus, .tab-content input:focus, .tab-content select:focus, .tab-content textarea:focus {
+            border: 1.5px solid #111827 !important;
+            background: #fff !important;
+        }
+        .btn-primary, .btn-dashboard-secondary, .btn-primary-cta {
+            font-family: 'Bricolage Grotesque', 'Inter', Arial, sans-serif !important;
+            border-radius: 14px !important;
+            background: #111827 !important;
+            color: #fff !important;
+            font-weight: 600;
+            font-size: 0.97rem;
+            padding: 14px 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            transition: background 0.2s, color 0.2s;
+        }
+        .btn-primary:hover, .btn-dashboard-secondary:hover, .btn-primary-cta:hover {
+            background: #222 !important;
+            color: #fff !important;
+        }
+        .dashboard-tabs, .-mb-px.flex.space-x-4 {
+            background: none !important;
+            border-bottom: 1.5px solid #F1F2F4 !important;
+            margin-bottom: 32px !important;
+            padding-bottom: 0 !important;
+        }
+        .dashboard-tabs button, .-mb-px.flex.space-x-4 button, .dashboard-tabs .tab-button, .dashboard-tabs .dashboard-tab {
+            font-family: 'Bricolage Grotesque', 'Inter', Arial, sans-serif !important;
+            background: none !important;
+            border: none !important;
+            color: #6B7280 !important;
+            font-weight: 600;
+            font-size: 1.05rem;
+            border-radius: 10px 10px 0 0 !important;
+            padding: 10px 18px !important;
+            margin-right: 4px;
+            transition: color 0.2s, background 0.2s;
+        }
+        .dashboard-tabs button.active, .-mb-px.flex.space-x-4 button.active, .dashboard-tabs .tab-button.active, .dashboard-tabs .dashboard-tab.active {
+            color: #111827 !important;
+            background: #F9FAFB !important;
+            border-bottom: 2.5px solid #111827 !important;
+        }
+        /* Responsive minimalist tweaks */
+        @media (max-width: 900px) {
+            .dashboard-container, .tab-content {
+                padding: 18px 4vw !important;
+            }
+        }
+        @media (max-width: 700px) {
+            .dashboard-container, .tab-content {
+                padding: 8px 2vw !important;
+            }
+            .dashboard-tabs, .-mb-px.flex.space-x-4 {
+                flex-wrap: wrap !important;
+            }
+        }
+
+        /* --- DASHBOARD BUTTONS & CARDS: MODERN MINIMALIST REDESIGN --- */
+        .btn-primary, .btn-dashboard-secondary, .btn-primary-cta {
+            font-family: 'Inter', Arial, sans-serif !important;
+            border-radius: 10px !important;
+            background: #4361EE !important;
+            color: #fff !important;
+            font-weight: 600;
+            font-size: 0.97rem;
+            padding: 13px 0 !important;
+            border: 1.5px solid #4361EE !important;
+            box-shadow: none !important;
+            transition: background 0.18s, color 0.18s, border 0.18s;
+            outline: none;
+        }
+        .btn-primary:hover, .btn-dashboard-secondary:hover, .btn-primary-cta:hover {
+            background: #fff !important;
+            color: #4361EE !important;
+            border: 1.5px solid #4361EE !important;
+        }
+        .btn-dashboard-secondary {
+            background: #fff !important;
+            color: #4361EE !important;
+            border: 1.5px solid #4361EE !important;
+        }
+        .btn-dashboard-secondary:active, .btn-primary:active, .btn-primary-cta:active {
+            background: #e0e7ff !important;
+            color: #222 !important;
+        }
+        /* Remove old gradients and heavy shadows from dashboard buttons */
+
+        /* --- DASHBOARD CARDS & CONTAINERS --- */
+        .dashboard-container, .dashboard-card, .tab-content, .card-panel, .bg-gray-50, .bg-white, .shadow-lg, .rounded-xl, .rounded-lg {
+            font-family: 'Inter', Arial, sans-serif !important;
+            background: #fff !important;
+            border-radius: 14px !important;
+            box-shadow: 0 1px 4px rgba(67,97,238,0.06);
+            border: 1.2px solid #E5E7EB;
+            padding: 28px 18px !important;
+        }
+        .dashboard-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 36px 18px !important;
+        }
+        .tab-content {
+            margin-bottom: 28px;
+            padding: 24px 12px !important;
+        }
+        .dashboard-card {
+            margin-bottom: 1.5rem;
+            padding: 1.5rem 1.2rem;
+        }
+        /* Remove old heavy box-shadows from dashboard cards */
+        /* --- DASHBOARD TABS --- */
+        .dashboard-tabs button, .-mb-px.flex.space-x-4 button, .dashboard-tabs .tab-button, .dashboard-tabs .dashboard-tab {
+            font-family: 'Inter', Arial, sans-serif !important;
+            background: none !important;
+            border: none !important;
+            color: #6B7280 !important;
+            font-weight: 600;
+            font-size: 1.05rem;
+            border-radius: 8px 8px 0 0 !important;
+            padding: 10px 18px !important;
+            margin-right: 4px;
+            transition: color 0.18s, background 0.18s;
+        }
+        .dashboard-tabs button.active, .-mb-px.flex.space-x-4 button.active, .dashboard-tabs .tab-button.active, .dashboard-tabs .dashboard-tab.active {
+            color: #4361EE !important;
+            background: #F3F4F6 !important;
+            border-bottom: 2.5px solid #4361EE !important;
+        }
+        /* --- DASHBOARD INPUTS --- */
+        .form-input, .tab-content input, .tab-content select, .tab-content textarea {
+            font-family: 'Inter', Arial, sans-serif !important;
+            border-radius: 8px !important;
+            border: 1.2px solid #E5E7EB !important;
+            background: #F9FAFB !important;
+            color: #111827 !important;
+            font-size: 1.05rem;
+            padding: 12px 14px !important;
+            box-shadow: none !important;
+            transition: border 0.18s, background 0.18s;
+        }
+        .form-input:focus, .tab-content input:focus, .tab-content select:focus, .tab-content textarea:focus {
+            border: 1.2px solid #4361EE !important;
+            background: #fff !important;
+        }
+        /* --- DASHBOARD MESSAGE BOXES --- */
+        .message-box {
+            border-radius: 8px;
+            font-size: 0.98rem;
+            padding: 10px 0;
+        }
+        /* --- DASHBOARD TABLES --- */
+        .table-header th {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #6b7280;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .table-row td {
+            font-size: 1rem;
+            color: #374151;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        /* --- DASHBOARD BADGES --- */
+        .badge {
+            border-radius: 999px;
+            font-size: 0.95em;
+            font-weight: 600;
+            padding: 0.3em 1em;
+        }
+        /* --- RESPONSIVE TWEAKS --- */
+        @media (max-width: 900px) {
+            .dashboard-container, .tab-content {
+                padding: 12px 2vw !important;
+            }
+        }
+        @media (max-width: 700px) {
+            .dashboard-container, .tab-content {
+                padding: 6px 1vw !important;
+            }
+        }
+
+        /* --- UNIFY ASSIGN TASK SECTION WITH DASHBOARD --- */
+        #create-task-form {
+            background: #fff !important;
+            border: 1.2px solid #E5E7EB !important;
+            border-radius: 14px !important;
+            box-shadow: 0 1px 4px rgba(67,97,238,0.06);
+            padding: 24px 16px !important;
+            margin-bottom: 1.5rem;
+        }
+        #create-task-form label {
+            font-family: 'Inter', Arial, sans-serif !important;
+            color: #6B7280;
+            font-weight: 500;
+            font-size: 0.98rem;
+            margin-bottom: 4px;
+        }
+        #create-task-form input, #create-task-form select, #create-task-form textarea {
+            font-family: 'Inter', Arial, sans-serif !important;
+            border-radius: 8px !important;
+            border: 1.2px solid #E5E7EB !important;
+            background: #F9FAFB !important;
+            color: #111827 !important;
+            font-size: 0.97rem;
+            padding: 12px 14px !important;
+            box-shadow: none !important;
+            transition: border 0.18s, background 0.18s;
+        }
+        #create-task-form input:focus, #create-task-form select:focus, #create-task-form textarea:focus {
+            border: 1.2px solid #4361EE !important;
+            background: #fff !important;
+        }
+        #create-task-form h4 {
+            font-family: 'Inter', Arial, sans-serif !important;
+            color: #222;
+            font-weight: 700;
+            font-size: 1.13rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #create-task-form i {
+            color: #4361EE !important;
+            font-size: 1.1rem !important;
+        }
+
+        /* --- MATERIAL DESIGN DASHBOARD REVAMP --- */
+        /* Dashboard Navigation Tabs with FA Icons */
+        .dashboard-tabs, .-mb-px.flex.space-x-4 {
+            display: flex;
+            background: #fff;
+            border-bottom: 2px solid #E0E0E0;
+            margin-bottom: 32px;
+            padding: 0 8px;
+        }
+        .dashboard-tabs button, .-mb-px.flex.space-x-4 button, .dashboard-tabs .tab-button, .dashboard-tabs .dashboard-tab {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Inter', Arial, sans-serif !important;
+            background: none;
+            border: none;
+            color: #5F6368;
+            font-weight: 500;
+            font-size: 1.05rem;
+            border-radius: 0;
+            min-width: 120px;
+            min-height: 48px;
+            padding: 0 18px;
+            margin-right: 2px;
+            position: relative;
+            cursor: pointer;
+            transition: color 0.18s, background 0.18s;
+            outline: none;
+        }
+        .dashboard-tabs button .fa-solid, .dashboard-tabs .tab-button .fa-solid {
+            font-size: 1.15rem;
+            color: #4361EE;
+        }
+        .dashboard-tabs button.active, .dashboard-tabs .tab-button.active {
+            color: #4361EE;
+        }
+        .dashboard-tabs button.active::after, .dashboard-tabs .tab-button.active::after {
+            content: '';
+            display: block;
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -2px;
+            height: 3px;
+            background: #4361EE;
+            border-radius: 2px 2px 0 0;
+        }
+        .dashboard-tabs button:hover, .dashboard-tabs .tab-button:hover {
+            background: #F5F7FA;
+            color: #4361EE;
+        }
+        /* Material Card */
+        .dashboard-container, .dashboard-card, .tab-content, .card-panel, .bg-gray-50, .bg-white, .shadow-lg, .rounded-xl, .rounded-lg {
+            font-family: 'Inter', Arial, sans-serif !important;
+            background: #fff !important;
+            border-radius: 12px !important;
+            box-shadow: 0 2px 8px rgba(67,97,238,0.10);
+            border: 1px solid #E0E0E0;
+            padding: 28px 18px !important;
+        }
+        .dashboard-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 36px 18px !important;
+        }
+        .tab-content {
+            margin-bottom: 28px;
+            padding: 24px 12px !important;
+        }
+        .dashboard-card {
+            margin-bottom: 1.5rem;
+            padding: 1.5rem 1.2rem;
+        }
+        /* Material Buttons */
+        .btn-primary, .btn-dashboard-secondary, .btn-primary-cta {
+            font-family: 'Inter', Arial, sans-serif !important;
+            border-radius: 6px !important;
+            background: #4361EE !important;
+            color: #fff !important;
+            font-weight: 600;
+            font-size: 0.97rem;
+            padding: 12px 24px !important;
+            border: none !important;
+            box-shadow: 0 2px 4px rgba(67,97,238,0.10);
+            min-width: 96px;
+            min-height: 40px;
+            transition: background 0.18s, color 0.18s, box-shadow 0.18s;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover, .btn-dashboard-secondary:hover, .btn-primary-cta:hover {
+            background: #2949C6 !important;
+            color: #fff !important;
+            box-shadow: 0 4px 12px rgba(67,97,238,0.16);
+        }
+        .btn-dashboard-secondary {
+            background: #fff !important;
+            color: #4361EE !important;
+            border: 1.2px solid #4361EE !important;
+            box-shadow: none !important;
+        }
+        .btn-dashboard-secondary:hover {
+            background: #F5F7FA !important;
+            color: #2949C6 !important;
+        }
+        /* Material Inputs */
+        .form-input, .tab-content input, .tab-content select, .tab-content textarea {
+            font-family: 'Inter', Arial, sans-serif !important;
+            border-radius: 6px !important;
+            border: 1.5px solid #BFC6D1 !important;
+            background: #F9FAFB !important;
+            color: #111827 !important;
+            font-size: 0.97rem;
+            padding: 13px 14px !important;
+            box-shadow: none !important;
+            transition: border 0.18s, background 0.18s;
+        }
+        .form-input:focus, .tab-content input:focus, .tab-content select:focus, .tab-content textarea:focus {
+            border: 1.5px solid #4361EE !important;
+            background: #fff !important;
+        }
+        /* Material Labels */
+        .tab-content label, .form-input + label, label {
+            font-family: 'Inter', Arial, sans-serif !important;
+            color: #5F6368;
+            font-weight: 500;
+            font-size: 0.97rem;
+            margin-bottom: 4px;
+        }
+        /* Material Table */
+        .table-header th {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #5F6368;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        .table-row td {
+            font-size: 1rem;
+            color: #374151;
+            border-bottom: 1px solid #F3F4F6;
+        }
+        /* Material Badges */
+        .badge {
+            border-radius: 999px;
+            font-size: 0.95em;
+            font-weight: 600;
+            padding: 0.3em 1em;
+            background: #F5F7FA;
+            color: #4361EE;
+        }
+        /* Responsive Material Tweaks */
+        @media (max-width: 900px) {
+            .dashboard-container, .tab-content {
+                padding: 12px 2vw !important;
+            }
+            .dashboard-tabs, .-mb-px.flex.space-x-4 {
+                flex-wrap: wrap;
+            }
+        }
+        @media (max-width: 700px) {
+            .dashboard-container, .tab-content {
+                padding: 6px 1vw !important;
+            }
+        }
+        /* --- END MATERIAL DESIGN DASHBOARD REVAMP --- */
+
+        /* --- UNIFY TASK MANAGEMENT SECTION WITH DASHBOARD --- */
+        #tasks-tab, #tasks-tab > h3, #create-task-form {
+            background: #fff !important;
+            border: 1px solid #E0E0E0 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 2px 8px rgba(67,97,238,0.10);
+            padding: 28px 18px !important;
+        }
+        #tasks-tab > h3 {
+            margin-bottom: 18px;
+            font-family: 'Inter', Arial, sans-serif !important;
+            color: #222;
+            font-weight: 700;
+            font-size: 1.25rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #create-task-form label {
+            font-family: 'Inter', Arial, sans-serif !important;
+            color: #5F6368;
+            font-weight: 500;
+            font-size: 0.97rem;
+            margin-bottom: 4px;
+        }
+        #create-task-form input, #create-task-form select, #create-task-form textarea {
+            font-family: 'Inter', Arial, sans-serif !important;
+            border-radius: 6px !important;
+            border: 1.5px solid #BFC6D1 !important;
+            background: #F9FAFB !important;
+            color: #111827 !important;
+            font-size: 0.97rem;
+            padding: 13px 14px !important;
+            box-shadow: none !important;
+            transition: border 0.18s, background 0.18s;
+        }
+        #create-task-form input:focus, #create-task-form select:focus, #create-task-form textarea:focus {
+            border: 1.5px solid #4361EE !important;
+            background: #fff !important;
+        }
+        #create-task-form h4 {
+            font-family: 'Inter', Arial, sans-serif !important;
+            color: #222;
+            font-weight: 700;
+            font-size: 1.13rem;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #create-task-form i {
+            color: #4361EE !important;
+            font-size: 1.1rem !important;
+        }
+
+        /* --- NOTION-STYLE DASHBOARD REVAMP --- */
+        .dashboard-container, .dashboard-card, .tab-content, .card-panel, .bg-gray-50, .bg-white, .shadow-lg, .rounded-xl, .rounded-lg {
+            font-family: 'Bricolage Grotesque', Arial, sans-serif !important;
+            background: #fff !important;
+            border-radius: 8px !important;
+            box-shadow: none !important;
+            border: 1px solid #e3e5e8 !important;
+            padding: 32px 24px !important;
+        }
+        .tab-content {
+            margin-bottom: 32px;
+            padding: 32px 24px !important;
+        }
+        .dashboard-card {
+            margin-bottom: 2rem;
+            padding: 2rem 1.5rem;
+        }
+        .dashboard-tabs, .-mb-px.flex.space-x-4 {
+            display: flex;
+            background: #fafbfc;
+            border-bottom: 1px solid #e3e5e8;
+            margin-bottom: 32px;
+            padding: 0 8px;
+        }
+        .dashboard-tabs button, .-mb-px.flex.space-x-4 button, .dashboard-tabs .tab-button, .dashboard-tabs .dashboard-tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Bricolage Grotesque', Arial, sans-serif !important;
+            background: none;
+            border: none;
+            color: #444;
+            font-weight: 500;
+            font-size: 1.05rem;
+            border-radius: 6px 6px 0 0;
+            min-width: 110px;
+            min-height: 44px;
+            padding: 0 16px;
+            margin-right: 2px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.14s, color 0.14s;
+            outline: none;
+        }
+        .dashboard-tabs button .fa-solid, .dashboard-tabs .tab-button .fa-solid {
+            font-size: 1.02rem;
+            color: #b1b5bb;
+        }
+        .dashboard-tabs button.active, .dashboard-tabs .tab-button.active {
+            color: #222;
+            background: #f4f5f7;
+            font-weight: 600;
+        }
+        .dashboard-tabs button.active::after, .dashboard-tabs .tab-button.active::after {
+            content: '';
+            display: block;
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 0;
+            height: 2px;
+            background: #222;
+            border-radius: 1px 1px 0 0;
+        }
+        .dashboard-tabs button:hover, .dashboard-tabs .tab-button:hover {
+            background: #f4f5f7;
+            color: #222;
+        }
+        /* Notion-style Buttons */
+        .btn-primary, .btn-dashboard-secondary, .btn-primary-cta {
+            font-family: 'Bricolage Grotesque', Arial, sans-serif !important;
+            border-radius: 6px !important;
+            background: #f4f5f7 !important;
+            color: #222 !important;
+            font-weight: 500;
+            font-size: 0.97rem;
+            padding: 11px 22px !important;
+            border: 1px solid #e3e5e8 !important;
+            box-shadow: none !important;
+            min-width: 90px;
+            min-height: 38px;
+            transition: background 0.14s, color 0.14s, border 0.14s;
+            outline: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover, .btn-dashboard-secondary:hover, .btn-primary-cta:hover {
+            background: #ececec !important;
+            color: #111 !important;
+            border: 1px solid #b1b5bb !important;
+        }
+        .btn-dashboard-secondary {
+            background: #fff !important;
+            color: #444 !important;
+            border: 1px solid #e3e5e8 !important;
+        }
+        .btn-dashboard-secondary:hover {
+            background: #f4f5f7 !important;
+            color: #111 !important;
+        }
+        /* Notion-style Inputs */
+        .form-input, .tab-content input, .tab-content select, .tab-content textarea {
+            font-family: 'Bricolage Grotesque', Arial, sans-serif !important;
+            border-radius: 6px !important;
+            border: 1px solid #e3e5e8 !important;
+            background: #fafbfc !important;
+            color: #222 !important;
+            font-size: 0.97rem;
+            padding: 13px 14px !important;
+            box-shadow: none !important;
+            transition: border 0.14s, background 0.14s;
+        }
+        .form-input:focus, .tab-content input:focus, .tab-content select:focus, .tab-content textarea:focus {
+            border: 1px solid #b1b5bb !important;
+            background: #fff !important;
+        }
+        /* Notion-style Headings */
+        .tab-content h2, .tab-content h3, .tab-content h4, .dashboard-container h1 {
+            font-family: 'Bricolage Grotesque', Arial, sans-serif !important;
+            color: #222;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            margin-bottom: 18px;
+        }
+        /* Notion-style Table */
+        .table-header th {
+            font-size: 0.97rem;
+            font-weight: 600;
+            color: #888;
+            border-bottom: 1px solid #e3e5e8;
+        }
+        .table-row td {
+            font-size: 1rem;
+            color: #444;
+            border-bottom: 1px solid #f4f5f7;
+        }
+        /* Notion-style Badges */
+        .badge {
+            border-radius: 999px;
+            font-size: 0.95em;
+            font-weight: 500;
+            padding: 0.3em 1em;
+            background: #f4f5f7;
+            color: #888;
+        }
+        /* Notion-style Message Box */
+        .message-box {
+            border-radius: 6px;
+            font-size: 0.98rem;
+            padding: 10px 0;
+            background: #fafbfc;
+            border: 1px solid #e3e5e8;
+            color: #444;
+        }
+        /* Responsive Notion Tweaks */
+        @media (max-width: 900px) {
+            .dashboard-container, .tab-content {
+                padding: 16px 2vw !important;
+            }
+            .dashboard-tabs, .-mb-px.flex.space-x-4 {
+                flex-wrap: wrap;
+            }
+        }
+        @media (max-width: 700px) {
+            .dashboard-container, .tab-content {
+                padding: 8px 1vw !important;
+            }
+        }
+        /* --- END NOTION-STYLE DASHBOARD REVAMP --- */
     </style>
 </head>
-<body>
+<body style="width: 100%; max-width: 100%;">
     <!-- Nav Bar -->
     <header style="background: #4361EE; color: #fff; height: 70px; display: flex; align-items: center; justify-content: space-between; position: relative; z-index: 100; font-family: 'Inter', Arial, sans-serif;">
         <div style="font-size: 2rem; font-weight: 700; color: #000; margin-left: 32px; font-family: 'Inter', Arial, sans-serif;">VMS</div>
@@ -1033,7 +1694,14 @@
             <!-- Tabs Navigation -->
             <div class="border-b border-gray-200 mb-6">
                 <nav class="-mb-px flex space-x-4" id="dashboard-tabs">
-                    <!-- Tabs will be dynamically added here based on role -->
+                    <button class="tab-button active"><i class="fa-solid fa-list-check"></i> Assign Tasks</button>
+                    <button class="tab-button"><i class="fa-solid fa-calendar-check"></i> Attendance</button>
+                    <button class="tab-button"><i class="fa-solid fa-star"></i> Ratings</button>
+                    <button class="tab-button"><i class="fa-solid fa-money-bill-wave"></i> Expenses</button>
+                    <button class="tab-button"><i class="fa-solid fa-chart-bar"></i> Reports</button>
+                    <button class="tab-button"><i class="fa-solid fa-tasks"></i> Tasks</button>
+                    <button class="tab-button"><i class="fa-solid fa-user"></i> Profile</button>
+                    <button class="tab-button"><i class="fa-solid fa-sign-out-alt"></i> Logout</button>
                 </nav>
             </div>
 
@@ -1265,22 +1933,22 @@
                 <div id="all-users-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
             </div>
 
-            <div id="tasks-tab" class="tab-content hidden p-4 border rounded-lg border-gray-200 bg-gray-50">
-                <h3 class="text-2xl font-extrabold text-purple-700 mb-6 flex items-center gap-2">
+            <div id="tasks-tab" class="tab-content hidden">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4 flex items-center gap-2">
                     <i class="fa-solid fa-list-check text-purple-500"></i> Task Management
                 </h3>
-                <form id="create-task-form" class="space-y-6 bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-200 transition-transform duration-200 hover:shadow-2xl">
-                    <h4 class="text-lg font-semibold text-gray-800 mb-2 flex items-center gap-2">
+                <form id="create-task-form" class="space-y-4 mb-6">
+                    <h4 class="text-lg font-medium text-gray-700 mb-2 flex items-center gap-2">
                         <i class="fa-solid fa-plus-circle text-green-500"></i> Create New Task
                     </h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label for="new-task-title" class="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                            <input type="text" id="new-task-title" class="form-input focus:ring-2 focus:ring-purple-400 transition-all" required>
+                            <input type="text" id="new-task-title" class="form-input" required>
                         </div>
                         <div>
                             <label for="new-task-priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                            <select id="new-task-priority" class="form-input focus:ring-2 focus:ring-purple-400 transition-all" required>
+                            <select id="new-task-priority" class="form-input" required>
                                 <option value="">Select Priority</option>
                                 <option value="Low">🟢 Low</option>
                                 <option value="Medium">🟡 Medium</option>
@@ -1289,31 +1957,31 @@
                         </div>
                         <div class="md:col-span-2">
                             <label for="new-task-description" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                            <textarea id="new-task-description" class="form-input h-24 focus:ring-2 focus:ring-purple-400 transition-all" required></textarea>
+                            <textarea id="new-task-description" class="form-input h-24" required></textarea>
                         </div>
                         <div>
                             <label for="new-task-deadline" class="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
-                            <input type="date" id="new-task-deadline" class="form-input focus:ring-2 focus:ring-purple-400 transition-all" required>
+                            <input type="date" id="new-task-deadline" class="form-input" required>
                         </div>
                         <div>
                             <label for="new-task-assign-to" class="block text-sm font-medium text-gray-700 mb-1">Assign To (Optional)</label>
-                            <select id="new-task-assign-to" class="form-input focus:ring-2 focus:ring-purple-400 transition-all">
+                            <select id="new-task-assign-to" class="form-input">
                                 <option value="">Leave Unassigned</option>
                                 <!-- Options will be populated dynamically -->
                             </select>
                         </div>
                     </div>
-                    <button type="submit" class="btn-primary bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-all duration-200 transform hover:scale-105 flex items-center gap-2">
+                    <button type="submit" class="btn-primary flex items-center gap-2">
                         <i class="fa-solid fa-paper-plane"></i> Create Task
                     </button>
                 </form>
                 <div id="create-task-message" class="message-box hidden"></div>
 
-                <h4 class="text-xl font-semibold text-gray-800 mb-4 mt-8 flex items-center gap-2">
+                <h4 class="text-lg font-medium text-gray-700 mb-4 mt-8 flex items-center gap-2">
                     <i class="fa-solid fa-table-list text-blue-500"></i> All Tasks
                 </h4>
                 <div class="flex space-x-4 mb-4">
-                    <select id="admin-task-status-filter" class="form-input w-1/3 focus:ring-2 focus:ring-purple-400 transition-all">
+                    <select id="admin-task-status-filter" class="form-input w-1/3">
                         <option value="">All Statuses</option>
                         <option value="Pending">Pending</option>
                         <option value="In Progress">In Progress</option>
@@ -1443,7 +2111,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer" style="width: 100%;max-width: 100%;">
         <div class="footer-main">
             <div class="footer-about">
                 <div class="footer-about-title"><i class="fa-solid fa-info-circle"></i> About VMS</div>
@@ -1483,3 +2151,4 @@
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
 </body>
 </html>
+
