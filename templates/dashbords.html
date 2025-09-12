@@ -1,0 +1,1538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volunteer Management System Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"/>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body, .dashboard-container, .dashboard-card, .tab-content, .card-panel {
+            font-family: 'Bricolage Grotesque', Arial, sans-serif !important;
+        }
+        .dashboard-bg { background: linear-gradient(120deg, #f8fafc 0%, #f4f5f7 100%); min-height: 100vh; }
+        .dashboard-container { max-width: 1100px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 24px 0 rgba(0,0,0,0.06); padding: 40px 32px 32px 32px; margin-top: 40px; }
+        .dashboard-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+        .dashboard-title { font-size: 2.2rem; font-weight: 700; color: #222; letter-spacing: -0.01em; }
+        .dashboard-user { font-size: 1.1rem; color: #666; font-weight: 500; }
+        .dashboard-tabs { display: flex; gap: 8px; border-bottom: 1.5px solid #e3e5e8; margin-bottom: 32px; background: #fafbfc; padding: 0 8px; }
+        .dashboard-tabs button { background: none; border: none; color: #444; font-weight: 500; font-size: 1.08rem; border-radius: 6px 6px 0 0; min-width: 110px; min-height: 44px; padding: 0 18px; margin-right: 2px; position: relative; cursor: pointer; transition: background 0.14s, color 0.14s; outline: none; display: flex; align-items: center; gap: 8px; }
+        .dashboard-tabs button.active { color: #222; background: #f4f5f7; font-weight: 600; }
+        .dashboard-tabs button.active::after { content: ''; display: block; position: absolute; left: 16px; right: 16px; bottom: 0; height: 2px; background: #222; border-radius: 1px 1px 0 0; }
+        .dashboard-tabs button:hover { background: #f4f5f7; color: #222; }
+        .tab-content { display: none; padding: 32px 0 0 0; }
+        .tab-content.active { display: block; }
+        .dashboard-card { background: #fafbfc; border-radius: 10px; box-shadow: 0 2px 8px 0 rgba(0,0,0,0.03); padding: 28px 24px; margin-bottom: 24px; }
+        .dashboard-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+        .dashboard-table th, .dashboard-table td { padding: 12px 10px; border-bottom: 1px solid #e3e5e8; text-align: left; }
+        .dashboard-table th { color: #888; font-weight: 600; font-size: 1rem; }
+        .dashboard-table td { color: #444; font-size: 1.04rem; }
+        .btn-primary { font-family: 'Bricolage Grotesque', Arial, sans-serif !important; border-radius: 6px; background: #222; color: #fff; font-weight: 500; font-size: 1rem; padding: 11px 22px; border: none; min-width: 90px; min-height: 38px; transition: background 0.14s, color 0.14s; outline: none; position: relative; overflow: hidden; }
+        .btn-primary:hover { background: #444; }
+        .loading-spinner { display: inline-block; width: 24px; height: 24px; border: 3px solid #e3e5e8; border-top: 3px solid #222; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .error-message { color: #d32f2f; font-weight: 500; margin: 12px 0; }
+        .form-input { font-family: 'Bricolage Grotesque', Arial, sans-serif !important; border: 1px solid #e3e5e8; border-radius: 6px; padding: 10px 12px; font-size: 1rem; background: #fff; color: #222; transition: border-color 0.14s; outline: none; }
+        .form-input:focus { border-color: #222; }
+        @media (max-width: 900px) { .dashboard-container { padding: 16px 2vw; } .dashboard-header { flex-direction: column; align-items: flex-start; gap: 12px; } }
+        @media (max-width: 700px) { .dashboard-container { padding: 8px 1vw; } .dashboard-title { font-size: 1.3rem; } }
+    </style>
+</head>
+<body class="dashboard-bg">
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">Volunteer Management System</div>
+            {% if current_user %}
+            <div class="dashboard-user">Welcome, <b>{{ current_user.name }}</b> <span style="color:#bbb;">|</span> <span style="text-transform:capitalize;">{{ current_user.role }}</span></div>
+            {% endif %}
+        </div>
+        <nav class="dashboard-tabs" id="dashboard-tabs">
+            {% if current_user and current_user.role == 'admin' %}
+                <button class="tab-button active" data-tab="tasks-tab"><i class="fa-solid fa-list-check"></i> Tasks</button>
+                <button class="tab-button" data-tab="users-tab"><i class="fa-solid fa-users"></i> Users</button>
+                <button class="tab-button" data-tab="attendance-tab"><i class="fa-solid fa-calendar-check"></i> Attendance</button>
+                <button class="tab-button" data-tab="ratings-tab"><i class="fa-solid fa-star"></i> Ratings</button>
+                <button class="tab-button" data-tab="expenses-tab"><i class="fa-solid fa-money-bill-wave"></i> Expenses</button>
+                <button class="tab-button" data-tab="reports-tab"><i class="fa-solid fa-chart-bar"></i> Reports</button>
+                <button class="tab-button" data-tab="profile-tab"><i class="fa-solid fa-user"></i> Profile</button>
+                <button class="tab-button" data-tab="logout-tab"><i class="fa-solid fa-sign-out-alt"></i> Logout</button>
+            {% elif current_user and current_user.role == 'coordinator' %}
+                <button class="tab-button active" data-tab="tasks-tab"><i class="fa-solid fa-list-check"></i> Tasks</button>
+                <button class="tab-button" data-tab="volunteers-tab"><i class="fa-solid fa-users"></i> Volunteers</button>
+                <button class="tab-button" data-tab="attendance-tab"><i class="fa-solid fa-calendar-check"></i> Attendance</button>
+                <button class="tab-button" data-tab="ratings-tab"><i class="fa-solid fa-star"></i> Ratings</button>
+                <button class="tab-button" data-tab="expenses-tab"><i class="fa-solid fa-money-bill-wave"></i> Expenses</button>
+                <button class="tab-button" data-tab="reports-tab"><i class="fa-solid fa-chart-bar"></i> Reports</button>
+                <button class="tab-button" data-tab="profile-tab"><i class="fa-solid fa-user"></i> Profile</button>
+                <button class="tab-button" data-tab="logout-tab"><i class="fa-solid fa-sign-out-alt"></i> Logout</button>
+            {% elif current_user and current_user.role == 'volunteer' %}
+                <button class="tab-button active" data-tab="tasks-tab"><i class="fa-solid fa-list-check"></i> Tasks</button>
+                <button class="tab-button" data-tab="attendance-tab"><i class="fa-solid fa-calendar-check"></i> Attendance</button>
+                <button class="tab-button" data-tab="profile-tab"><i class="fa-solid fa-user"></i> Profile</button>
+                <button class="tab-button" data-tab="logout-tab"><i class="fa-solid fa-sign-out-alt"></i> Logout</button>
+            {% endif %}
+        </nav>
+        <div id="tasks-tab" class="tab-content active">
+            <div class="dashboard-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;margin-top: 0px;padding-top: 0px;">
+                    
+                    {% if current_user.role == 'admin' or current_user.role == 'coordinator' %}
+                    <button class="btn-primary" id="add-task-btn"><i class="fa fa-plus"></i> Add Task</button>
+                    {% endif %}
+                </div>
+                <div id="tasks-table-container"></div>
+            </div>
+        </div>
+        <!-- Modal for Add/Edit Task -->
+        <div id="task-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:1000;align-items:center;justify-content:center;">
+            <div style="background:#fff;padding:32px 24px;border-radius:10px;min-width:320px;max-width:90vw;box-shadow:0 2px 16px 0 rgba(0,0,0,0.12);position:relative;">
+                <h3 id="task-modal-title" style="margin-bottom:18px;"></h3>
+                <form id="task-form">
+                    <input type="hidden" id="task-id" />
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="task-title" placeholder="Title" required /></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="task-desc" placeholder="Description" required /></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="task-deadline" type="date" required /></div>
+                    <div style="margin-bottom:12px;"><select class="form-input" style="width:100%;" id="task-priority" required><option value="">Priority</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="task-assigned-to" placeholder="Assigned To (user_id)" /></div>
+                    <div style="display:flex;gap:12px;justify-content:flex-end;">
+                        <button type="button" class="btn-primary" id="cancel-task-btn" style="background:#bbb;">Cancel</button>
+                        <button type="submit" class="btn-primary" id="save-task-btn">Save</button>
+                    </div>
+                </form>
+                <div id="task-modal-msg" style="margin-top:10px;"></div>
+            </div>
+        </div>
+        <div id="volunteers-tab" class="tab-content"><div class="dashboard-card" id="volunteers-content"></div></div>
+        <div id="attendance-tab" class="tab-content"><div class="dashboard-card" id="attendance-content"></div></div>
+        <!-- Remove volunteer ratings-tab content -->
+        <div id="ratings-tab" class="tab-content"><div class="dashboard-card" id="ratings-content"></div></div>
+        <div id="expenses-tab" class="tab-content"><div class="dashboard-card" id="expenses-content"></div></div>
+        <div id="reports-tab" class="tab-content"><div class="dashboard-card" id="reports-content"></div></div>
+        <div id="profile-tab" class="tab-content"><div class="dashboard-card" id="profile-content"></div></div>
+        <!-- Volunteer Edit Profile Modal -->
+        <div id="edit-profile-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:1000;align-items:center;justify-content:center;">
+            <div style="background:#fff;padding:32px 24px;border-radius:10px;min-width:320px;max-width:90vw;box-shadow:0 2px 16px 0 rgba(0,0,0,0.12);position:relative;">
+                <h3 style="margin-bottom:18px;">Edit Profile</h3>
+                <form id="edit-profile-form">
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="edit-profile-name" placeholder="Name" required /></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="edit-profile-email" placeholder="Email" required /></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="edit-profile-contact" placeholder="Contact" /></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="edit-profile-password" placeholder="New Password (leave blank to keep)" type="password" /></div>
+                    <div style="display:flex;gap:12px;justify-content:flex-end;">
+                        <button type="button" class="btn-primary" id="cancel-edit-profile-btn" style="background:#bbb;">Cancel</button>
+                        <button type="submit" class="btn-primary" id="save-edit-profile-btn">Save</button>
+                    </div>
+                </form>
+                <div id="edit-profile-modal-msg" style="margin-top:10px;"></div>
+            </div>
+        </div>
+        <div id="users-tab" class="tab-content">
+            <div class="dashboard-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                    <h3 style="margin:0;"><i class="fa-solid fa-users"></i> User Management</h3>
+                    <button class="btn-primary" id="add-user-btn"><i class="fa fa-plus"></i> Add User</button>
+                </div>
+                <div id="users-table-container"></div>
+            </div>
+        </div>
+        <!-- Modal for Add/Edit User -->
+        <div id="user-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:1000;align-items:center;justify-content:center;">
+            <div style="background:#fff;padding:32px 24px;border-radius:10px;min-width:320px;max-width:90vw;box-shadow:0 2px 16px 0 rgba(0,0,0,0.12);position:relative;">
+                <h3 id="user-modal-title" style="margin-bottom:18px;"></h3>
+                <form id="user-form">
+                    <input type="hidden" id="user-id" />
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="user-name" placeholder="Name" required /></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="user-email" placeholder="Email" required /></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="user-contact" placeholder="Contact" /></div>
+                    <div style="margin-bottom:12px;"><select class="form-input" style="width:100%;" id="user-role" required><option value="">Role</option><option>volunteer</option><option>coordinator</option><option>admin</option></select></div>
+                    <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="user-password" placeholder="Password" type="password" /></div>
+                    <div style="display:flex;gap:12px;justify-content:flex-end;">
+                        <button type="button" class="btn-primary" id="cancel-user-btn" style="background:#bbb;">Cancel</button>
+                        <button type="submit" class="btn-primary" id="save-user-btn">Save</button>
+                    </div>
+                </form>
+                <div id="user-modal-msg" style="margin-top:10px;"></div>
+            </div>
+        </div>
+        <div id="logout-tab" class="tab-content"><div class="dashboard-card" style="text-align:center;"><h3 style="margin-bottom:18px;"><i class="fa-solid fa-sign-out-alt"></i> Logout</h3><button class="btn-primary" id="logout-button">Log Out</button></div></div>
+    </div>
+    <!-- Modal for Add/Edit Rating -->
+    <div id="rating-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:32px 24px;border-radius:10px;min-width:320px;max-width:90vw;box-shadow:0 2px 16px 0 rgba(0,0,0,0.12);position:relative;">
+            <h3 id="rating-modal-title" style="margin-bottom:18px;"></h3>
+            <form id="rating-form">
+                <input type="hidden" id="rating-id" />
+                <div style="margin-bottom:12px;"><select class="form-input" style="width:100%;" id="rating-volunteer-id" required></select></div>
+                <div style="margin-bottom:12px;"><select class="form-input" style="width:100%;" id="rating-task-id" required></select></div>
+                <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="rating-score" placeholder="Score (1-5)" type="number" min="1" max="5" required /></div>
+                <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="rating-comments" placeholder="Comments" /></div>
+                <div style="display:flex;gap:12px;justify-content:flex-end;">
+                    <button type="button" class="btn-primary" id="cancel-rating-btn" style="background:#bbb;">Cancel</button>
+                    <button type="submit" class="btn-primary" id="save-rating-btn">Save</button>
+                </div>
+            </form>
+            <div id="rating-modal-msg" style="margin-top:10px;"></div>
+        </div>
+    </div>
+    <!-- Modal for Add/Edit Expense -->
+    <div id="expense-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:32px 24px;border-radius:10px;min-width:320px;max-width:90vw;box-shadow:0 2px 16px 0 rgba(0,0,0,0.12);position:relative;">
+            <h3 id="expense-modal-title" style="margin-bottom:18px;"></h3>
+            <form id="expense-form">
+                <input type="hidden" id="expense-id" />
+                <div style="margin-bottom:12px;"><select class="form-input" style="width:100%;" id="expense-task-id" required></select></div>
+                <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="expense-amount" placeholder="Amount" type="number" min="0" required /></div>
+                <div style="margin-bottom:12px;"><input class="form-input" style="width:100%;" id="expense-category" placeholder="Category" required /></div>
+                <div style="display:flex;gap:12px;justify-content:flex-end;">
+                    <button type="button" class="btn-primary" id="cancel-expense-btn" style="background:#bbb;">Cancel</button>
+                    <button type="submit" class="btn-primary" id="save-expense-btn">Save</button>
+                </div>
+            </form>
+            <div id="expense-modal-msg" style="margin-top:10px;"></div>
+        </div>
+    </div>
+    
+    <!-- Modal for Assign/Reassign Task -->
+    <div id="assign-task-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:1000;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:32px 24px;border-radius:10px;min-width:320px;max-width:90vw;box-shadow:0 2px 16px 0 rgba(0,0,0,0.12);position:relative;">
+            <h3 id="assign-task-modal-title" style="margin-bottom:18px;">Assign Task to Volunteer</h3>
+            <form id="assign-task-form">
+                <input type="hidden" id="assign-task-id" />
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;margin-bottom:4px;font-weight:500;">Select Volunteer:</label>
+                    <select class="form-input" style="width:100%;" id="assign-volunteer-id" required>
+                        <option value="">Choose a volunteer...</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;margin-bottom:4px;font-weight:500;">Priority:</label>
+                    <select class="form-input" style="width:100%;" id="assign-priority">
+                        <option value="">Keep current priority</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="display:block;margin-bottom:4px;font-weight:500;">Deadline:</label>
+                    <input class="form-input" style="width:100%;" id="assign-deadline" type="date" />
+                </div>
+                <div style="display:flex;gap:12px;justify-content:flex-end;">
+                    <button type="button" class="btn-primary" id="cancel-assign-btn" style="background:#bbb;">Cancel</button>
+                    <button type="submit" class="btn-primary" id="save-assign-btn">Assign Task</button>
+                </div>
+            </form>
+            <div id="assign-task-modal-msg" style="margin-top:10px;"></div>
+        </div>
+    </div>
+    <script>
+    // DOM assignments for ratings/expenses and modals (force-inserted at top)
+    const ratingsContent = document.getElementById('ratings-content');
+    const expensesContent = document.getElementById('expenses-content');
+    const ratingModal = document.getElementById('rating-modal');
+    const ratingForm = document.getElementById('rating-form');
+    const ratingModalTitle = document.getElementById('rating-modal-title');
+    const cancelRatingBtn = document.getElementById('cancel-rating-btn');
+    const saveRatingBtn = document.getElementById('save-rating-btn');
+    const ratingModalMsg = document.getElementById('rating-modal-msg');
+    const expenseModal = document.getElementById('expense-modal');
+    const expenseForm = document.getElementById('expense-form');
+    const expenseModalTitle = document.getElementById('expense-modal-title');
+    const cancelExpenseBtn = document.getElementById('cancel-expense-btn');
+    const saveExpenseBtn = document.getElementById('save-expense-btn');
+    const expenseModalMsg = document.getElementById('expense-modal-msg');
+
+    // --- Role detection (from Jinja) ---
+    const USER_ROLE = "{{ current_user.role }}";
+
+    
+
+    // --- Volunteer: Dynamically add My Ratings tab and content before tab switching logic ---
+    if (USER_ROLE === 'volunteer') {
+        const tabs = document.getElementById('dashboard-tabs');
+        if (!tabs.querySelector('[data-tab="myratings-tab"]')) {
+            const ratingsTab = document.createElement('button');
+            ratingsTab.className = 'tab-button';
+            ratingsTab.setAttribute('data-tab', 'myratings-tab');
+            ratingsTab.innerHTML = `<i class='fa-solid fa-star'></i> My Ratings`;
+            tabs.insertBefore(ratingsTab, tabs.querySelector('[data-tab="profile-tab"]'));
+            // Add content div
+            const ratingsContent = document.createElement('div');
+            ratingsContent.id = 'myratings-tab';
+            ratingsContent.className = 'tab-content';
+            ratingsContent.innerHTML = `<div class='dashboard-card' id='myratings-content'></div>`;
+            document.querySelector('.dashboard-container').appendChild(ratingsContent);
+        }
+    }
+
+    // --- Tab switching logic ---
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            tabButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const tabId = btn.getAttribute('data-tab');
+            tabContents.forEach(tc => tc.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            loadTabData(tabId);
+        });
+    });
+    // --- Logout button logic ---
+    const logoutBtn = document.getElementById('logout-button');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            fetch('/logout', {method: 'POST'}).then(() => window.location.href = '/');
+        });
+    }
+    // --- Utility: show loading spinner ---
+    function showLoading(el) {
+        el.innerHTML = '<div style="text-align:center;"><span class="loading-spinner"></span></div>';
+    }
+    function showError(el, msg) {
+        el.innerHTML = `<div class='error-message'>${msg}</div>`;
+    }
+    // --- Load tab data dynamically ---
+    async function loadTabData(tabId) {
+        if (tabId === 'ratings-tab') return await fetchRatings();
+        if (tabId === 'expenses-tab') return await fetchExpenses();
+        if (tabId === 'myratings-tab') return await loadMyRatings();
+        if (tabId === 'absentees-tab') return await loadAbsentees();
+        if (tabId === 'tasks-tab') return await loadTasks();
+        if (tabId === 'volunteers-tab') return await loadVolunteers();
+        if (tabId === 'attendance-tab') return await loadAttendance();
+        if (tabId === 'reports-tab') return await loadReports();
+        if (tabId === 'profile-tab') return await loadProfile();
+        if (tabId === 'users-tab') return await fetchUsers();
+        // fallback: do nothing
+    }
+    // --- On first load, load default tab ---
+    document.addEventListener('DOMContentLoaded', () => {
+        loadTabData('tasks-tab');
+    });
+    // --- Fetch helpers ---
+    async function apiGet(url) {
+        const resp = await fetch(url, {credentials: 'same-origin'});
+        if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+        return resp.json();
+    }
+    // --- Loaders for each tab ---
+    async function loadTasks() {
+        if (USER_ROLE === 'admin') return loadTasksAdmin();
+        if (USER_ROLE === 'coordinator') return loadTasksCoordinator();
+        if (USER_ROLE === 'volunteer') return loadTasksVolunteer();
+    }
+    async function loadTasksAdmin() {
+        const el = document.getElementById('tasks-table-container');
+        showLoading(el);
+        try {
+            const data = await apiGet('/tasks');
+            renderTasksTable(data);
+        } catch (e) { showError(el, e.message); }
+    }
+    async function loadTasksCoordinator() {
+        const el = document.getElementById('tasks-table-container');
+        showLoading(el);
+        try {
+            let [tasksData, volunteersData] = await Promise.all([
+                apiGet('/tasks'),
+                apiGet('/volunteers')
+            ]);
+            let html = `<h3 style='margin-bottom:18px;'><i class='fa-solid fa-list-check'></i> Task Management</h3>`;
+            html += `<table class='dashboard-table'><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Assigned To</th><th>Actions</th></tr></thead><tbody>`;
+            tasksData.forEach(t => {
+                const assignedVolunteer = volunteersData.find(v => v.user_id === t.assigned_to);
+                const assignedName = assignedVolunteer ? assignedVolunteer.name : (t.assigned_to || 'Unassigned');
+                html += `<tr>
+                    <td>${t.title}</td>
+                    <td>${t.deadline}</td>
+                    <td>${t.status}</td>
+                    <td>${assignedName}</td>
+                    <td>
+                        <button class='btn-primary' style='background:#888;margin-right:6px;' onclick='assignTaskToVolunteer("${t.task_id}")'>Assign/Reassign</button>
+                        <button class='btn-primary' style='background:#888;margin-right:6px;' onclick='editTask("${t.task_id}")'>Edit</button>
+                        <button class='btn-primary' style='background:#d32f2f;' onclick='deleteTaskCoordinator("${t.task_id}")'>Delete</button>
+                    </td>
+                </tr>`;
+            });
+            html += `</tbody></table>`;
+            el.innerHTML = html;
+        } catch (e) { showError(el, e.message); }
+    }
+    // Coordinator can delete only their own created tasks (optional, or disable button)
+    window.deleteTaskCoordinator = async function(task_id) {
+        if (!confirm('Delete this task?')) return;
+        try {
+            const resp = await fetch(`/tasks/${task_id}`, {method:'DELETE', credentials:'same-origin'});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            loadTasks();
+        } catch (e) { alert(e.message); }
+    };
+    async function loadTasksVolunteer() {
+        const el = document.getElementById('tasks-table-container');
+        showLoading(el);
+        try {
+            let data = await apiGet('/tasks/assigned');
+            el.innerHTML = `<h3 style='margin-bottom:18px;'><i class='fa-solid fa-list-check'></i> My Tasks</h3>` +
+                `<table class='dashboard-table'><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Action</th></tr></thead><tbody>` +
+                data.map(t => `<tr><td>${t.title}</td><td>${t.deadline}</td><td>${t.status}</td><td>` +
+                    (t.status !== 'Completed' ? `<button class='btn-primary' onclick='markTaskCompleted("${t.task_id}")'>Mark as Completed</button>` : '-') +
+                    `</td></tr>`).join('') +
+                `</tbody></table>`;
+        } catch (e) { showError(el, e.message); }
+    }
+
+    async function loadVolunteers() {
+        const el = document.getElementById('volunteers-content');
+        showLoading(el);
+        try {
+            let data = await apiGet('/volunteers');
+            el.innerHTML = `<h3 style='margin-bottom:18px;'><i class='fa-solid fa-users'></i> Volunteers</h3>` +
+                `<table class='dashboard-table'><thead><tr><th>Name</th><th>Email</th><th>Contact</th></tr></thead><tbody>` +
+                data.map(v => `<tr><td>${v.name}</td><td>${v.email}</td><td>${v.contact || '-'}</td></tr>`).join('') +
+                `</tbody></table>`;
+        } catch (e) { showError(el, e.message); }
+    }
+    window.markTaskCompleted = async function(task_id) {
+        try {
+            const resp = await fetch(`/tasks/update_status/${task_id}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'same-origin',
+                body: JSON.stringify({status: 'Completed'})
+            });
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            loadTasksVolunteer();
+        } catch (e) { alert(e.message); }
+    };
+    function renderTasksTable(tasks) {
+        let html = `<table class='dashboard-table'><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Assigned To</th><th>Actions</th></tr></thead><tbody>`;
+        html += tasks.map(t => `<tr><td>${t.title}</td><td>${t.deadline}</td><td>${t.status}</td><td>${t.assigned_to || '-'}</td><td><button class='btn-primary' style='background:#888;margin-right:6px;' onclick='editTask("${t.task_id}")'>Edit</button><button class='btn-primary' style='background:#d32f2f;' onclick='deleteTask("${t.task_id}")'>Delete</button></td></tr>`).join('');
+        html += '</tbody></table>';
+        document.getElementById('tasks-table-container').innerHTML = html;
+    }
+    window.editTask = async function(task_id) {
+        try {
+            const data = await apiGet(`/tasks/${task_id}`);
+            openTaskModal(true, {...data, task_id});
+        } catch (e) { alert(e.message); }
+    };
+    window.deleteTask = async function(task_id) {
+        if (!confirm('Delete this task?')) return;
+        try {
+            const resp = await fetch(`/tasks/${task_id}`, {method:'DELETE', credentials:'same-origin'});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            loadTasks(); // Reload tasks after deletion
+        } catch (e) { alert(e.message); }
+    };
+    const taskModal = document.getElementById('task-modal');
+    const taskForm = document.getElementById('task-form');
+    const taskModalTitle = document.getElementById('task-modal-title');
+    const cancelTaskBtn = document.getElementById('cancel-task-btn');
+    const saveTaskBtn = document.getElementById('save-task-btn');
+    const taskModalMsg = document.getElementById('task-modal-msg');
+    const addTaskBtn = document.getElementById('add-task-btn');
+    function openTaskModal(edit, task={}) {
+        taskModal.style.display = 'flex';
+        taskModalTitle.textContent = edit ? 'Edit Task' : 'Add Task';
+        taskForm.reset();
+        taskModalMsg.textContent = '';
+        document.getElementById('task-id').value = task.task_id || '';
+        document.getElementById('task-title').value = task.title || '';
+        document.getElementById('task-desc').value = task.description || '';
+        document.getElementById('task-deadline').value = task.deadline || '';
+        document.getElementById('task-priority').value = task.priority || '';
+        document.getElementById('task-assigned-to').value = task.assigned_to || '';
+    }
+    function closeTaskModal() { taskModal.style.display = 'none'; }
+    if (cancelTaskBtn) cancelTaskBtn.onclick = closeTaskModal;
+    if (addTaskBtn) addTaskBtn.onclick = () => openTaskModal(false);
+    taskForm.onsubmit = async function(e) {
+        e.preventDefault();
+        saveTaskBtn.disabled = true;
+        taskModalMsg.textContent = '';
+        const id = document.getElementById('task-id').value;
+        const title = document.getElementById('task-title').value;
+        const description = document.getElementById('task-desc').value;
+        const deadline = document.getElementById('task-deadline').value;
+        const priority = document.getElementById('task-priority').value;
+        const assigned_to = document.getElementById('task-assigned-to').value;
+        const data = {title, description, deadline, priority, assigned_to};
+        try {
+            let resp;
+            if (id) {
+                resp = await fetch(`/tasks/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            } else {
+                resp = await fetch('/tasks/create', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            }
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            closeTaskModal();
+            loadTasks(); // Reload tasks after save
+        } catch (e) { taskModalMsg.textContent = e.message; }
+        saveTaskBtn.disabled = false;
+    };
+
+    // --- COORDINATOR: Task Assignment Modal ---
+    const assignTaskModal = document.getElementById('assign-task-modal');
+    const assignTaskForm = document.getElementById('assign-task-form');
+    const cancelAssignBtn = document.getElementById('cancel-assign-btn');
+    const saveAssignBtn = document.getElementById('save-assign-btn');
+    const assignTaskModalMsg = document.getElementById('assign-task-modal-msg');
+
+    function openAssignTaskModal(taskId) {
+        assignTaskModal.style.display = 'flex';
+        assignTaskModalMsg.textContent = '';
+        document.getElementById('assign-task-id').value = taskId;
+        document.getElementById('assign-volunteer-id').value = '';
+        document.getElementById('assign-priority').value = '';
+        document.getElementById('assign-deadline').value = '';
+        
+        // Populate volunteers dropdown
+        populateVolunteersDropdown();
+    }
+
+    function closeAssignTaskModal() {
+        assignTaskModal.style.display = 'none';
+    }
+
+    async function populateVolunteersDropdown() {
+        try {
+            const volunteers = await apiGet('/volunteers');
+            const select = document.getElementById('assign-volunteer-id');
+            select.innerHTML = '<option value="">Choose a volunteer...</option>' +
+                volunteers.map(v => `<option value="${v.user_id}">${v.name} (${v.user_id})</option>`).join('');
+        } catch (e) {
+            console.error('Failed to load volunteers:', e);
+        }
+    }
+
+    if (cancelAssignBtn) cancelAssignBtn.onclick = closeAssignTaskModal;
+
+    assignTaskForm.onsubmit = async function(e) {
+        e.preventDefault();
+        saveAssignBtn.disabled = true;
+        assignTaskModalMsg.textContent = '';
+        
+        const taskId = document.getElementById('assign-task-id').value;
+        const volunteerId = document.getElementById('assign-volunteer-id').value;
+        const priority = document.getElementById('assign-priority').value;
+        const deadline = document.getElementById('assign-deadline').value;
+        
+        if (!volunteerId) {
+            assignTaskModalMsg.textContent = 'Please select a volunteer.';
+            saveAssignBtn.disabled = false;
+            return;
+        }
+        
+        const data = { volunteer_id: volunteerId };
+        if (priority) data.priority = priority;
+        if (deadline) data.deadline = deadline;
+        
+        try {
+            const resp = await fetch('/tasks/assign_volunteer', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({ ...data, task_id: taskId })
+            });
+            
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            
+            closeAssignTaskModal();
+            loadTasks(); // Reload tasks after assignment
+        } catch (e) {
+            assignTaskModalMsg.textContent = e.message;
+        }
+        
+        saveAssignBtn.disabled = false;
+    };
+
+    // Global function for coordinator to assign tasks
+    window.assignTaskToVolunteer = function(taskId) {
+        openAssignTaskModal(taskId);
+    };
+
+    // --- USERS CRUD (Admin) ---
+    const usersTableContainer = document.getElementById('users-table-container');
+    const addUserBtn = document.getElementById('add-user-btn');
+    const userModal = document.getElementById('user-modal');
+    const userForm = document.getElementById('user-form');
+    const userModalTitle = document.getElementById('user-modal-title');
+    const cancelUserBtn = document.getElementById('cancel-user-btn');
+    const saveUserBtn = document.getElementById('save-user-btn');
+    const userModalMsg = document.getElementById('user-modal-msg');
+
+    function openUserModal(edit, user={}) {
+        userModal.style.display = 'flex';
+        userModalTitle.textContent = edit ? 'Edit User' : 'Add User';
+        userForm.reset();
+        userModalMsg.textContent = '';
+        document.getElementById('user-id').value = user.user_id || '';
+        document.getElementById('user-name').value = user.name || '';
+        document.getElementById('user-email').value = user.email || '';
+        document.getElementById('user-contact').value = user.contact || '';
+        document.getElementById('user-role').value = user.role || '';
+        document.getElementById('user-password').value = '';
+    }
+    function closeUserModal() { userModal.style.display = 'none'; }
+    if (cancelUserBtn) cancelUserBtn.onclick = closeUserModal;
+    if (addUserBtn) addUserBtn.onclick = () => openUserModal(false);
+
+    async function fetchUsers() {
+        showLoading(usersTableContainer);
+        try {
+            const data = await apiGet('/users');
+            renderUsersTable(data);
+        } catch (e) { showError(usersTableContainer, e.message); }
+    }
+    function renderUsersTable(users) {
+        let html = `<table class='dashboard-table'><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Contact</th><th>Actions</th></tr></thead><tbody>`;
+        html += users.map(u => `<tr><td>${u.name}</td><td>${u.email}</td><td>${u.role}</td><td>${u.contact || ''}</td><td><button class='btn-primary' style='background:#888;margin-right:6px;' onclick='editUser("${u.user_id}")'>Edit</button><button class='btn-primary' style='background:#d32f2f;' onclick='deleteUser("${u.user_id}")'>Delete</button></td></tr>`).join('');
+        html += '</tbody></table>';
+        usersTableContainer.innerHTML = html;
+    }
+    window.editUser = async function(user_id) {
+        try {
+            const data = await apiGet(`/users`);
+            const user = data.find(u => u.user_id === user_id);
+            openUserModal(true, user);
+        } catch (e) { alert(e.message); }
+    }
+    window.deleteUser = async function(user_id) {
+        if (!confirm('Delete this user?')) return;
+        try {
+            const resp = await fetch(`/users/${user_id}`, {method:'DELETE', credentials:'same-origin'});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            fetchUsers();
+        } catch (e) { alert(e.message); }
+    }
+    userForm.onsubmit = async function(e) {
+        e.preventDefault();
+        saveUserBtn.disabled = true;
+        userModalMsg.textContent = '';
+        const id = document.getElementById('user-id').value;
+        const name = document.getElementById('user-name').value;
+        const email = document.getElementById('user-email').value;
+        const contact = document.getElementById('user-contact').value;
+        const role = document.getElementById('user-role').value;
+        const password = document.getElementById('user-password').value;
+        const data = {name, email, contact, role};
+        if (password) data.password = password;
+        try {
+            let resp;
+            if (id) {
+                resp = await fetch(`/users/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            } else {
+                if (!password) throw new Error('Password required for new user');
+                data.password = password;
+                resp = await fetch('/users/create', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            }
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            closeUserModal();
+            fetchUsers();
+        } catch (e) { userModalMsg.textContent = e.message; }
+        saveUserBtn.disabled = false;
+    };
+
+    // --- RATINGS CRUD (Admin/Coordinator) ---
+    function renderRatingsTable(ratings) {
+        ratingsContent.innerHTML = '';
+        // Header with Add Rating button on the left
+        const headerDiv = document.createElement('div');
+        headerDiv.style.display = 'flex';
+        headerDiv.style.justifyContent = 'flex-start';
+        headerDiv.style.alignItems = 'center';
+        headerDiv.style.marginBottom = '10px';
+        let addRatingBtn = document.createElement('button');
+    addRatingBtn.className = 'btn-primary';
+    addRatingBtn.innerHTML = '<i class="fa fa-plus"></i> Add Rating';
+    addRatingBtn.onclick = () => openRatingModal(false);
+        headerDiv.appendChild(addRatingBtn);
+        headerDiv.appendChild(document.createElement('div'));
+        ratingsContent.appendChild(headerDiv);
+        // Table
+        let html = `<table class='dashboard-table'><thead><tr><th>Volunteer</th><th>Task</th><th>Score</th><th>Comments</th><th>Actions</th></tr></thead><tbody>`;
+        if (ratings && ratings.length) {
+            html += ratings.map(r => `<tr><td>${r.volunteer_id}</td><td>${r.task_id}</td><td>${r.score}</td><td>${r.comments}</td><td><button class='btn-primary' style='background:#888;margin-right:6px;' onclick='editRating("${r.rating_id}")'>Edit</button><button class='btn-primary' style='background:#c00;' onclick='deleteRating("${r.rating_id}")'>Delete</button></td></tr>`).join('');
+        } else {
+            html += `<tr><td colspan='5' style='text-align:center;'>No ratings found.</td></tr>`;
+        }
+        html += `</tbody></table>`;
+        const tableDiv = document.createElement('div');
+        tableDiv.innerHTML = html;
+        ratingsContent.appendChild(tableDiv);
+    }
+    async function fetchRatings() {
+        showLoading(ratingsContent);
+        try {
+            let data = await apiGet('/ratings');
+            renderRatingsTable(data);
+        } catch (e) {
+            renderRatingsTable([]);
+        }
+    }
+    window.editRating = async function(rating_id) {
+        try {
+            let data = await apiGet('/ratings');
+            const rating = data.find(r => r.rating_id === rating_id);
+            openRatingModal(true, rating);
+        } catch (e) { alert(e.message); }
+    }
+    window.deleteRating = async function(rating_id) {
+        if (!confirm('Delete this rating?')) return;
+        try {
+            const resp = await fetch(`/ratings/${rating_id}`, {method:'DELETE', credentials:'same-origin'});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            fetchRatings();
+        } catch (e) { alert(e.message); }
+    }
+    ratingForm.onsubmit = async function(e) {
+        e.preventDefault();
+        saveRatingBtn.disabled = true;
+        ratingModalMsg.textContent = '';
+        const id = document.getElementById('rating-id').value;
+        const volunteer_id = document.getElementById('rating-volunteer-id').value;
+        const task_id = document.getElementById('rating-task-id').value;
+        const score = parseInt(document.getElementById('rating-score').value);
+        const comments = document.getElementById('rating-comments').value;
+        if (!volunteer_id || !task_id) {
+            ratingModalMsg.textContent = 'Please select a volunteer and a task.';
+            saveRatingBtn.disabled = false;
+            return;
+        }
+        const data = {volunteer_id, task_id, score, comments};
+        try {
+            let resp;
+            if (id) {
+                resp = await fetch(`/ratings/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            } else {
+                resp = await fetch('/ratings/add', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            }
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            closeRatingModal();
+            fetchRatings();
+        } catch (e) { ratingModalMsg.textContent = e.message; }
+        saveRatingBtn.disabled = false;
+    };
+    // --- EXPENSES CRUD (Admin/Coordinator) ---
+    function renderExpensesTable(expenses) {
+        expensesContent.innerHTML = '';
+        // Header with Add Expense button on the left
+        const headerDiv = document.createElement('div');
+        headerDiv.style.display = 'flex';
+        headerDiv.style.justifyContent = 'flex-start';
+        headerDiv.style.alignItems = 'center';
+        headerDiv.style.marginBottom = '10px';
+        let addExpenseBtn = document.createElement('button');
+    addExpenseBtn.className = 'btn-primary';
+    addExpenseBtn.innerHTML = '<i class="fa fa-plus"></i> Add Expense';
+        addExpenseBtn.onclick = openExpenseModal;
+        headerDiv.appendChild(addExpenseBtn);
+        headerDiv.appendChild(document.createElement('div'));
+        expensesContent.appendChild(headerDiv);
+        // Section header for Expenses
+        const sectionHeader = document.createElement('h3');
+        sectionHeader.style.marginBottom = '18px';
+        sectionHeader.innerHTML = '<i class="fa-solid fa-money-bill-wave"></i> Expenses';
+        expensesContent.appendChild(sectionHeader);
+        // Table
+        let html = `<table class='dashboard-table'><thead><tr><th>Task</th><th>Category</th><th>Amount</th><th>Comments</th><th>Actions</th></tr></thead><tbody>`;
+        if (expenses && expenses.length) {
+            html += expenses.map(e => `<tr><td>${e.task_id}</td><td>${e.category}</td><td>${e.amount}</td><td>${e.comments}</td><td><button class='btn-primary' style='background:#888;margin-right:6px;' onclick='editExpense("${e.expense_id}")'>Edit</button><button class='btn-primary' style='background:#c00;' onclick='deleteExpense("${e.expense_id}")'>Delete</button></td></tr>`).join('');
+        } else {
+            html += `<tr><td colspan='5' style='text-align:center;'>No expenses found.</td></tr>`;
+        }
+        html += `</tbody></table>`;
+        const tableDiv = document.createElement('div');
+        tableDiv.innerHTML = html;
+        expensesContent.appendChild(tableDiv);
+    }
+    async function fetchExpenses() {
+        showLoading(expensesContent);
+        try {
+            let data = await apiGet('/expenses');
+            renderExpensesTable(data);
+        } catch (e) {
+            renderExpensesTable([]);
+        }
+    }
+    window.editExpense = async function(expense_id) {
+        try {
+            let data = await apiGet('/expenses');
+            const expense = data.find(e => e.expense_id === expense_id);
+            openExpenseModal(true, expense);
+        } catch (e) { alert(e.message); }
+    }
+    window.deleteExpense = async function(expense_id) {
+        if (!confirm('Delete this expense?')) return;
+        try {
+            const resp = await fetch(`/expenses/${expense_id}`, {method:'DELETE', credentials:'same-origin'});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            fetchExpenses();
+        } catch (e) { alert(e.message); }
+    }
+    expenseForm.onsubmit = async function(e) {
+        e.preventDefault();
+        saveExpenseBtn.disabled = true;
+        expenseModalMsg.textContent = '';
+        const id = document.getElementById('expense-id').value;
+        const task_id = document.getElementById('expense-task-id').value;
+        const amount = document.getElementById('expense-amount').value;
+        const category = document.getElementById('expense-category').value;
+        if (!task_id) {
+            expenseModalMsg.textContent = 'Please select a task.';
+            saveExpenseBtn.disabled = false;
+            return;
+        }
+        const data = {task_id, amount, category};
+        try {
+            let resp;
+            if (id) {
+                resp = await fetch(`/expenses/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            } else {
+                resp = await fetch('/expenses/log', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            }
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            closeExpenseModal();
+            fetchExpenses();
+        } catch (e) { expenseModalMsg.textContent = e.message; }
+        saveExpenseBtn.disabled = false;
+    };
+    window.editExpense = async function(expense_id) {
+        try {
+            let data = await apiGet('/expenses');
+            const expense = data.find(e => e.expense_id === expense_id);
+            openExpenseModal(true, expense);
+        } catch (e) { alert(e.message); }
+    }
+    window.deleteExpense = async function(expense_id) {
+        if (!confirm('Delete this expense?')) return;
+        try {
+            const resp = await fetch(`/expenses/${expense_id}`, {method:'DELETE', credentials:'same-origin'});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            fetchExpenses();
+        } catch (e) { alert(e.message); }
+    }
+    
+    // --- Coordinator/Admin: Attendance marking form ---
+    async function loadAttendance() {
+        const el = document.getElementById('attendance-content');
+        showLoading(el);
+        try {
+            if (USER_ROLE === 'volunteer') {
+                let attendance = await apiGet('/attendance/my');
+                let tableHtml = `<table class='dashboard-table'><thead><tr><th>Date</th><th>Task</th></tr></thead><tbody>` +
+                    attendance.map(a => `<tr><td>${a.date}</td><td>${a.task_id}</td></tr>`).join('') +
+                    `</tbody></table>`;
+                el.innerHTML = `<h3 style='margin-bottom:18px;'><i class='fa-solid fa-calendar-check'></i> My Attendance</h3>` + tableHtml;
+            } else {
+                // Coordinator/admin logic
+                let attendance, usersList, tasksList;
+                if (USER_ROLE === 'admin') {
+                    [attendance, usersList, tasksList] = await Promise.all([
+                    apiGet('/attendance'),
+                    apiGet('/users'),
+                    apiGet('/tasks')
+                ]);
+                } else {
+                    // coordinator
+                    [attendance, usersList, tasksList] = await Promise.all([
+                        apiGet('/attendance'),
+                        apiGet('/volunteers'),
+                        apiGet('/tasks')
+                    ]);
+                }
+                // Filter controls
+                let filterHtml = `<form id='attendance-filter-form' style='margin-bottom:12px;display:flex;gap:12px;align-items:center;'>` +
+                    `<select id='filter-user-id' class='form-input' style='min-width:140px;'><option value=''>All Users</option>` +
+                    usersList.filter(u => (USER_ROLE === 'admin' ? (u.role === 'volunteer' || u.role === 'coordinator' || u.role === undefined) : (u.role === 'volunteer' || u.role === undefined))).map(u => `<option value='${u.user_id}'>${u.name} (${u.user_id})</option>`).join('') +
+                    `</select>` +
+                    `<input id='filter-date' class='form-input' type='date' style='min-width:140px;' />` +
+                    `<button type='submit' class='btn-primary'>Filter</button>` +
+                    `</form>`;
+                // Mark attendance form (restored)
+                let formHtml = `<form id='mark-attendance-form' style='margin-bottom:18px;display:flex;gap:12px;align-items:center;'>` +
+                    `<select id='mark-user-id' class='form-input' required style='min-width:140px;'>` +
+                    usersList.filter(u => (USER_ROLE === 'admin' ? (u.role === 'volunteer' || u.role === 'coordinator' || u.role === undefined) : (u.role === 'volunteer' || u.role === undefined))).map(u => `<option value='${u.user_id}'>${u.name} (${u.user_id})</option>`).join('') +
+                    `</select>` +
+                    `<select id='mark-task-id' class='form-input' required style='min-width:140px;'>` +
+                    tasksList.map(t => `<option value='${t.task_id}'>${t.title}</option>`).join('') +
+                    `</select>` +
+                    `<input id='mark-date' class='form-input' type='date' value='${(new Date()).toISOString().slice(0,10)}' required />` +
+                    `<button type='submit' class='btn-primary'>Mark as Attended</button>` +
+                    `<span id='mark-attendance-msg' style='margin-left:12px;color:#d32f2f;'></span>` +
+                    `</form>`;
+                let tableHtml = `<table class='dashboard-table'><thead><tr><th>Date</th><th>User</th><th>Task</th></tr></thead><tbody>` +
+                    attendance.map(a => `<tr><td>${a.date}</td><td>${a.user_id}</td><td>${a.task_id}</td></tr>`).join('') +
+                    `</tbody></table>`;
+                el.innerHTML = `<h3 style='margin-bottom:18px;'><i class='fa-solid fa-calendar-check'></i> Attendance</h3>` + filterHtml + formHtml + tableHtml;
+                // --- Absentees table for admin ---
+                if (USER_ROLE === 'admin') {
+                    el.innerHTML += `<h4 class='report-section-header' style='margin-top:24px;animation:fadeInUp 0.7s;'><i class='fa-solid fa-user-slash'></i> Absentees</h4><div id='absentees-table-container'></div>`;
+                    loadAbsenteesTable();
+                }
+                document.getElementById('mark-attendance-form').onsubmit = async function(e) {
+                    e.preventDefault();
+                    const user_id = document.getElementById('mark-user-id').value;
+                    const task_id = document.getElementById('mark-task-id').value;
+                    const date = document.getElementById('mark-date').value;
+                    const msgEl = document.getElementById('mark-attendance-msg');
+                    msgEl.textContent = '';
+                    try {
+                        const resp = await fetch('/attendance/mark', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            credentials: 'same-origin',
+                            body: JSON.stringify({user_id, task_id, date})
+                        });
+                        if (!resp.ok) {
+                            const errorData = await resp.json();
+                            if (resp.status === 409) {
+                                msgEl.textContent = errorData.message || 'Attendance already submitted for this user, task, and date.';
+                            } else {
+                                throw new Error(errorData.message || 'Error marking attendance.');
+                            }
+                        } else {
+                            loadAttendance();
+                        }
+                    } catch (e) { msgEl.textContent = e.message; }
+                };
+                document.getElementById('attendance-filter-form').onsubmit = async function(e) {
+                    e.preventDefault();
+                    const userId = document.getElementById('filter-user-id').value;
+                    const date = document.getElementById('filter-date').value;
+                    loadFilteredAttendance(userId, '', date);
+                };
+            }
+        } catch (e) { showError(el, e.message); }
+    }
+    async function loadReports() {
+        const el = document.getElementById('reports-content');
+        showLoading(el);
+        try {
+            if (USER_ROLE === 'admin') {
+                const [tasks, ratings, attendance, expenses] = await Promise.all([
+                    apiGet('/tasks'),
+                    apiGet('/ratings'),
+                    apiGet('/attendance'),
+                    apiGet('/expenses')
+                ]);
+                // Calculate total expenses amount
+                const totalExpense = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+                // Calculate completed assignments
+                const completedAssignments = tasks.filter(t => t.status === 'Completed').length;
+                // --- No ratings card, no absentees card ---
+                let html = `<h3 style='margin-bottom:18px;animation:fadeInDown 0.7s;'><i class='fa-solid fa-chart-bar'></i> Detailed Reports</h3>`;
+                html += `<div style='display:flex;gap:24px;flex-wrap:wrap;margin-bottom:32px;'>
+                    <div style='flex:1;min-width:180px;background:#e3f6fc;border-radius:10px;padding:18px 16px;box-shadow:0 2px 8px 0 rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px;'>
+                        <i class='fa-solid fa-list-check' style='font-size:1.7rem;color:#0ea5e9;'></i>
+                        <div><div style='font-size:1.2rem;font-weight:700;'>${completedAssignments}/${tasks.length}</div><div style='color:#555;'>Assignments</div></div>
+                    </div>
+                    <div style='flex:1;min-width:180px;background:#e0f7e9;border-radius:10px;padding:18px 16px;box-shadow:0 2px 8px 0 rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px;'>
+                        <i class='fa-solid fa-calendar-check' style='font-size:1.7rem;color:#22c55e;'></i>
+                        <div><div style='font-size:1.2rem;font-weight:700;'>${attendance.length}</div><div style='color:#555;'>Attendance</div></div>
+                    </div>
+                    <div style='flex:1;min-width:180px;background:#fce7f3;border-radius:14px;padding:32px 18px;box-shadow:0 2px 12px 0 rgba(0,0,0,0.06);display:flex;flex-direction:column;align-items:center;justify-content:center;'>
+                        <i class='fa-solid fa-money-bill-wave' style='font-size:2.2rem;color:#ec4899;margin-bottom:10px;'></i>
+                        <div style='font-size:2.6rem;font-weight:800;letter-spacing:-1px;'>₹${totalExpense.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+                        <div style='color:#222;font-size:1.1rem;font-weight:600;margin-top:2px;'>Total Expenses</div>
+                    </div>
+                </div>`;
+                // Section divider helper
+                const divider = `<div style='height:2px;background:#f4f5f7;margin:32px 0 18px 0;border-radius:2px;'></div>`;
+                // Assignments (Tasks)
+                html += `<h4 class='report-section-header' style='margin-top:24px;animation:fadeInUp 0.7s;'><i class='fa-solid fa-list-check'></i> Assignments</h4>`;
+                html += `<table class='dashboard-table report-table'><thead><tr><th>Title</th><th>Deadline</th><th>Status</th><th>Assigned To</th></tr></thead><tbody>` +
+                    tasks.map((t,i) => `<tr style='background:${i%2?"#f8fafc":"#fff"};'><td>${t.title}</td><td>${t.deadline}</td><td>${t.status}</td><td>${t.assigned_to || '-'}</td></tr>`).join('') +
+                    `</tbody></table>` + divider;
+                // Attendance
+                html += `<h4 class='report-section-header' style='margin-top:24px;animation:fadeInUp 0.7s;'><i class='fa-solid fa-calendar-check'></i> Attendance</h4>`;
+                html += `<table class='dashboard-table report-table'><thead><tr><th>Date</th><th>User</th><th>Task</th></tr></thead><tbody>` +
+                    attendance.map((a,i) => `<tr style='background:${i%2?"#f8fafc":"#fff"};'><td>${a.date}</td><td>${a.user_id}</td><td>${a.task_id}</td></tr>`).join('') +
+                    `</tbody></table>` + divider;
+                // Expenses
+                html += `<h4 class='report-section-header' style='margin-top:24px;animation:fadeInUp 0.7s;'><i class='fa-solid fa-money-bill-wave'></i> Expenses</h4>`;
+                html += `<table class='dashboard-table report-table'><thead><tr><th>Task</th><th>Category</th><th>Amount</th><th>Comments</th></tr></thead><tbody>` +
+                    expenses.map((e,i) => `<tr style='background:${i%2?"#f8fafc":"#fff"};'><td>${e.task_id}</td><td>${e.category}</td><td>${e.amount}</td><td>${e.comments}</td></tr>`).join('') +
+                    `</tbody></table>`;
+                el.innerHTML = html;
+            } else if (USER_ROLE === 'coordinator') {
+                // Coordinator: fetch and render reports just like admin
+                const [tasks, attendance, expenses] = await Promise.all([
+                    apiGet('/tasks'),
+                    apiGet('/attendance'),
+                    apiGet('/expenses')
+                ]);
+                const totalExpense = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+                const completedAssignments = tasks.filter(t => t.status === 'Completed').length;
+                let html = `<h3 style='margin-bottom:18px;animation:fadeInDown 0.7s;'><i class='fa-solid fa-chart-bar'></i> Detailed Reports</h3>`;
+                html += `<div style='display:flex;gap:24px;flex-wrap:wrap;margin-bottom:32px;'>
+                    <div style='flex:1;min-width:180px;background:#e3f6fc;border-radius:10px;padding:18px 16px;box-shadow:0 2px 8px 0 rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px;'>
+                        <i class='fa-solid fa-list-check' style='font-size:1.7rem;color:#0ea5e9;'></i>
+                        <div><div style='font-size:1.2rem;font-weight:700;'>${completedAssignments}/${tasks.length}</div><div style='color:#555;'>Assignments</div></div>
+                    </div>
+                    <div style='flex:1;min-width:180px;background:#e0f7e9;border-radius:10px;padding:18px 16px;box-shadow:0 2px 8px 0 rgba(0,0,0,0.04);display:flex;align-items:center;gap:12px;'>
+                        <i class='fa-solid fa-calendar-check' style='font-size:1.7rem;color:#22c55e;'></i>
+                        <div><div style='font-size:1.2rem;font-weight:700;'>${attendance.length}</div><div style='color:#555;'>Attendance</div></div>
+                    </div>
+                    <div style='flex:1;min-width:180px;background:#fce7f3;border-radius:14px;padding:32px 18px;box-shadow:0 2px 12px 0 rgba(0,0,0,0.06);display:flex;flex-direction:column;align-items:center;justify-content:center;'>
+                        <i class='fa-solid fa-money-bill-wave' style='font-size:2.2rem;color:#ec4899;margin-bottom:10px;'></i>
+                        <div style='font-size:2.6rem;font-weight:800;letter-spacing:-1px;'>₹${totalExpense.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+                        <div style='color:#222;font-size:1.1rem;font-weight:600;margin-top:2px;'>Total Expenses</div>
+                    </div>
+                </div>`;
+                const divider = `<div style='height:2px;background:#f4f5f7;margin:32px 0 18px 0;border-radius:2px;'></div>`;
+                html += `<h4 class='report-section-header' style='margin-top:24px;animation:fadeInUp 0.7s;'><i class='fa-solid fa-list-check'></i> Assignments</h4>`;
+                html += `<table class='dashboard-table report-table'><thead><tr><th>Title</th><th>Deadline</th><th>Status</th><th>Assigned To</th></tr></thead><tbody>` +
+                    tasks.map((t,i) => `<tr style='background:${i%2?"#f8fafc":"#fff"};'><td>${t.title}</td><td>${t.deadline}</td><td>${t.status}</td><td>${t.assigned_to || '-'}</td></tr>`).join('') +
+                    `</tbody></table>` + divider;
+                html += `<h4 class='report-section-header' style='margin-top:24px;animation:fadeInUp 0.7s;'><i class='fa-solid fa-calendar-check'></i> Attendance</h4>`;
+                html += `<table class='dashboard-table report-table'><thead><tr><th>Date</th><th>User</th><th>Task</th></tr></thead><tbody>` +
+                    attendance.map((a,i) => `<tr style='background:${i%2?"#f8fafc":"#fff"};'><td>${a.date}</td><td>${a.user_id}</td><td>${a.task_id}</td></tr>`).join('') +
+                    `</tbody></table>` + divider;
+                html += `<h4 class='report-section-header' style='margin-top:24px;animation:fadeInUp 0.7s;'><i class='fa-solid fa-money-bill-wave'></i> Expenses</h4>`;
+                html += `<table class='dashboard-table report-table'><thead><tr><th>Task</th><th>Category</th><th>Amount</th><th>Comments</th></tr></thead><tbody>` +
+                    expenses.map((e,i) => `<tr style='background:${i%2?"#f8fafc":"#fff"};'><td>${e.task_id}</td><td>${e.category}</td><td>${e.amount}</td><td>${e.comments || ''}</td></tr>`).join('') +
+                    `</tbody></table>`;
+                el.innerHTML = html;
+            }
+        } catch (e) { showError(el, e.message); }
+    }
+    async function loadProfile() {
+        const el = document.getElementById('profile-content');
+        showLoading(el);
+        try {
+            const data = await apiGet('/profile');
+            let html = `<h3 style='margin-bottom:18px;'><i class='fa-solid fa-user'></i> Profile</h3>` +
+                `<div><b>Name:</b> ${data.name}<br><b>Email:</b> ${data.email}<br><b>Contact:</b> ${data.contact}<br><b>Role:</b> ${data.role}</div>`;
+            if (USER_ROLE === 'volunteer' || USER_ROLE === 'coordinator' || USER_ROLE === 'admin') {
+                html += `<div style='margin-top:18px;'><button class='btn-primary' id='edit-profile-btn'><i class='fa fa-edit'></i> Edit Profile</button></div>`;
+            }
+            el.innerHTML = html;
+            if (USER_ROLE === 'volunteer' || USER_ROLE === 'coordinator' || USER_ROLE === 'admin') {
+                document.getElementById('edit-profile-btn').onclick = openEditProfileModal;
+            }
+        } catch (e) { showError(el, e.message); }
+    }
+
+    // --- Volunteer Edit Profile Modal Logic ---
+    const editProfileModal = document.getElementById('edit-profile-modal');
+    const editProfileForm = document.getElementById('edit-profile-form');
+    const cancelEditProfileBtn = document.getElementById('cancel-edit-profile-btn');
+    const saveEditProfileBtn = document.getElementById('save-edit-profile-btn');
+    const editProfileModalMsg = document.getElementById('edit-profile-modal-msg');
+
+    function openEditProfileModal() {
+        editProfileModal.style.display = 'flex';
+        editProfileModalMsg.textContent = '';
+        // Pre-fill fields with current profile
+        apiGet('/profile').then(data => {
+            document.getElementById('edit-profile-name').value = data.name || '';
+            document.getElementById('edit-profile-email').value = data.email || '';
+            document.getElementById('edit-profile-contact').value = data.contact || '';
+            document.getElementById('edit-profile-password').value = '';
+        });
+    }
+    function closeEditProfileModal() { editProfileModal.style.display = 'none'; }
+    if (cancelEditProfileBtn) cancelEditProfileBtn.onclick = closeEditProfileModal;
+    editProfileForm.onsubmit = async function(e) {
+        e.preventDefault();
+        saveEditProfileBtn.disabled = true;
+        editProfileModalMsg.textContent = '';
+        const name = document.getElementById('edit-profile-name').value;
+        const email = document.getElementById('edit-profile-email').value;
+        const contact = document.getElementById('edit-profile-contact').value;
+        const new_password = document.getElementById('edit-profile-password').value;
+        const data = { name, email, contact };
+        if (new_password) data.new_password = new_password;
+        try {
+            const resp = await fetch('/profile/update', {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            closeEditProfileModal();
+            loadProfile();
+        } catch (e) { editProfileModalMsg.textContent = e.message; }
+        saveEditProfileBtn.disabled = false;
+    };
+
+    // --- Volunteer: My Ratings tab ---
+    async function loadMyRatings() {
+        const el = document.getElementById('myratings-content');
+        showLoading(el);
+        try {
+            let data = await apiGet('/ratings/my');
+            if (!data.length) {
+                el.innerHTML = '<div>No ratings yet.</div>';
+                return;
+            }
+            let html = `<table class='dashboard-table'><thead><tr><th>Task</th><th>Score</th><th>Comments</th></tr></thead><tbody>` +
+                data.map(r => `<tr><td>${r.task_id}</td><td>${r.score}</td><td>${r.comments}</td></tr>`).join('') +
+                `</tbody></table>`;
+            el.innerHTML = html;
+        } catch (e) { showError(el, e.message); }
+    }
+    // --- Absentees (Admin) ---
+    async function loadAbsentees() {
+        const el = document.getElementById('absentees-tab');
+        showLoading(el);
+        try {
+            const attendance = await apiGet('/attendance/absentees');
+            if (!attendance.length) {
+                el.innerHTML = '<div>No absentees found.</div>';
+                return;
+            }
+            let html = `<table class='dashboard-table'><thead><tr><th>Date</th><th>User</th><th>Task</th></tr></thead><tbody>`;
+            attendance.forEach(a => {
+                html += `<tr><td>${a.date}</td><td>${a.user_id}</td><td>${a.task_id}</td></tr>`;
+            });
+            html += `</tbody></table>`;
+            el.innerHTML = html;
+        } catch (e) { showError(el, e.message); }
+    }
+    // --- Filter Attendance (Admin/Coordinator) ---
+    async function loadFilteredAttendance(userId = '', taskId = '', date = '') {
+        const el = document.getElementById('attendance-content');
+        showLoading(el);
+        try {
+            const params = new URLSearchParams();
+            if (userId) params.append('user_id', userId);
+            if (taskId) params.append('task_id', taskId);
+            if (date) params.append('date', date);
+            const url = `/attendance/filter?${params.toString()}`;
+            const data = await apiGet(url);
+            let tableHtml = `<table class='dashboard-table'><thead><tr><th>Date</th><th>User</th><th>Task</th></tr></thead><tbody>`;
+            data.forEach(a => {
+                tableHtml += `<tr><td>${a.date}</td><td>${a.user_id}</td><td>${a.task_id}</td></tr>`;
+            });
+            tableHtml += `</tbody></table>`;
+            el.innerHTML = tableHtml;
+        } catch (e) { showError(el, e.message); }
+    }
+
+    // --- Filter Expenses (Admin/Coordinator) ---
+    async function loadFilteredExpenses(taskId = '', category = '', date = '') {
+        const el = document.getElementById('expenses-content');
+        showLoading(el);
+        try {
+            const params = new URLSearchParams();
+            if (taskId) params.append('task_id', taskId);
+            if (category) params.append('category', category);
+            if (date) params.append('date', date);
+            const url = `/expenses/filter?${params.toString()}`;
+            const data = await apiGet(url);
+            let tableHtml = `<table class='dashboard-table'><thead><tr><th>Task</th><th>Amount</th><th>Category</th><th>Logged By</th><th>Actions</th></tr></thead><tbody>`;
+            data.forEach(exp => {
+                tableHtml += `<tr><td>${exp.task_id}</td><td>$${exp.amount}</td><td>${exp.category}</td><td>${exp.logged_by}</td><td><button class='btn-primary' style='background:#888;margin-right:6px;' onclick='editExpense("${exp.expense_id}")'>Edit</button><button class='btn-primary' style='background:#d32f2f;' onclick='deleteExpense("${exp.expense_id}")'>Delete</button></td></tr>`;
+            });
+            tableHtml += `</tbody></table>`;
+            el.innerHTML = tableHtml;
+        } catch (e) { showError(el, e.message); }
+    }
+
+    // --- Filter Ratings (Admin/Coordinator) ---
+    async function loadFilteredRatings(volunteerId = '', taskId = '', score = '', comments = '') {
+        const el = document.getElementById('ratings-content');
+        showLoading(el);
+        try {
+            const params = new URLSearchParams();
+            if (volunteerId) params.append('volunteer_id', volunteerId);
+            if (taskId) params.append('task_id', taskId);
+            if (score) params.append('score', score);
+            if (comments) params.append('comments', comments);
+            const url = `/ratings/filter?${params.toString()}`;
+            const data = await apiGet(url);
+            let tableHtml = '';
+            if (USER_ROLE === 'admin' || USER_ROLE === 'coordinator') {
+                tableHtml += '<div style="display:flex;justify-content:flex-end;"></div>';
+                el.innerHTML = ''; // Clear existing buttons
+                el.appendChild(addRatingBtn); // Re-append add button
+            }
+            tableHtml += `<table class='dashboard-table'><thead><tr><th>Volunteer</th><th>Task</th><th>Score</th><th>Comments</th><th>Actions</th></tr></thead><tbody>`;
+            data.forEach(r => {
+                tableHtml += `<tr><td>${r.volunteer_id}</td><td>${r.task_id}</td><td>${r.score}</td><td>${r.comments}</td><td><button class='btn-primary' style='background:#888;margin-right:6px;' onclick='editRating("${r.rating_id}")'>Edit</button><button class='btn-primary' style='background:#d32f2f;' onclick='deleteRating("${r.rating_id}")'>Delete</button></td></tr>`;
+            });
+            tableHtml += `</tbody></table>`;
+            el.innerHTML += tableHtml;
+        } catch (e) { showError(el, e.message); }
+    }
+
+    // --- Filter Users (Admin) ---
+    async function loadFilteredUsers(role = '', name = '') {
+        const el = document.getElementById('users-table-container');
+        showLoading(el);
+        try {
+            const params = new URLSearchParams();
+            if (role) params.append('role', role);
+            if (name) params.append('name', name);
+            const url = `/users/filter?${params.toString()}`;
+            const data = await apiGet(url);
+            renderUsersTable(data);
+        } catch (e) { showError(el, e.message); }
+    }
+
+    // --- Filter Tasks (Admin/Coordinator) ---
+    async function loadFilteredTasks(status = '', priority = '', assignedTo = '') {
+        const el = document.getElementById('tasks-table-container');
+        showLoading(el);
+        try {
+            const params = new URLSearchParams();
+            if (status) params.append('status', status);
+            if (priority) params.append('priority', priority);
+            if (assignedTo) params.append('assigned_to', assignedTo);
+            const url = `/tasks/filter?${params.toString()}`;
+            const data = await apiGet(url);
+            renderTasksTable(data);
+        } catch (e) { showError(el, e.message); }
+    }
+
+    // --- Filter Volunteers (Admin) ---
+    async function loadFilteredVolunteers(role = '') {
+        const el = document.getElementById('volunteers-content');
+        showLoading(el);
+        try {
+            const params = new URLSearchParams();
+            if (role) params.append('role', role);
+            const url = `/volunteers/filter?${params.toString()}`;
+            const data = await apiGet(url);
+            renderVolunteersTable(data);
+        } catch (e) { showError(el, e.message); }
+    }
+
+    // --- Render helpers ---
+    function renderVolunteersTable(volunteers) {
+        const el = document.getElementById('volunteers-content');
+        el.innerHTML = `<h3 style='margin-bottom:18px;'><i class='fa-solid fa-users'></i> Volunteers</h3>` +
+            `<table class='dashboard-table'><thead><tr><th>Name</th><th>Email</th><th>Contact</th><th>Role</th><th>Actions</th></tr></thead><tbody>`;
+        volunteers.forEach(v => {
+            el.innerHTML += `<tr><td>${v.name}</td><td>${v.email}</td><td>${v.contact || '-'}</td><td>${v.role}</td><td><button class='btn-primary' style='background:#888;margin-right:6px;' onclick='editUser("${v.user_id}")'>Edit</button><button class='btn-primary' style='background:#d32f2f;' onclick='deleteUser("${v.user_id}")'>Delete</button></td></tr>`;
+        });
+        el.innerHTML += `</tbody></table>`;
+    }
+
+    // --- Coordinator: Edit Profile ---
+    if (USER_ROLE === 'coordinator') {
+        // Add Edit Profile button to profile tab
+        const origLoadProfile = loadProfile;
+        loadProfile = async function() {
+            const el = document.getElementById('profile-content');
+            showLoading(el);
+            try {
+                const data = await apiGet('/profile');
+                let html = `<h3 style='margin-bottom:18px;'><i class='fa-solid fa-user'></i> Profile</h3>` +
+                    `<div><b>Name:</b> ${data.name}<br><b>Email:</b> ${data.email}<br><b>Contact:</b> ${data.contact}<br><b>Role:</b> ${data.role}</div>`;
+                html += `<div style='margin-top:18px;'><button class='btn-primary' id='edit-profile-btn'><i class='fa fa-edit'></i> Edit Profile</button></div>`;
+                el.innerHTML = html;
+                document.getElementById('edit-profile-btn').onclick = openEditProfileModal;
+            } catch (e) { showError(el, e.message); }
+        }
+    }
+
+    // --- Add Rating Modal Logic (admin/coordinator) ---
+    let volunteerOptions = [];
+    let taskOptions = [];
+    async function fetchVolunteers() {
+        try {
+            const resp = await fetch('/volunteers', {credentials: 'same-origin'});
+            if (!resp.ok) throw new Error('Failed to fetch volunteers');
+            volunteerOptions = await resp.json();
+        } catch (e) { volunteerOptions = []; }
+    }
+    async function fetchTasks() {
+        try {
+            const resp = await fetch('/tasks', {credentials: 'same-origin'});
+            if (!resp.ok) throw new Error('Failed to fetch tasks');
+            taskOptions = await resp.json();
+        } catch (e) { taskOptions = []; }
+    }
+    async function openRatingModal(edit, rating={}) {
+        console.log('Opening Rating Modal', {edit, rating});
+        ratingModal.style.display = 'flex';
+        ratingModalTitle.textContent = edit ? 'Edit Rating' : 'Add Rating';
+        ratingForm.reset();
+        ratingModalMsg.textContent = '';
+        document.getElementById('rating-id').value = rating.rating_id || '';
+        try {
+            await fetchVolunteers();
+            await fetchTasks();
+        } catch (e) {
+            ratingModalMsg.textContent = 'Failed to load volunteers/tasks.';
+        }
+        const volunteerSelect = document.getElementById('rating-volunteer-id');
+        const taskSelect = document.getElementById('rating-task-id');
+        volunteerSelect.innerHTML = volunteerOptions.map(v => `<option value="${v.user_id}">${v.name} (${v.user_id})</option>`).join('');
+        taskSelect.innerHTML = taskOptions.map(t => `<option value="${t.task_id}">${t.title} (${t.task_id})</option>`).join('');
+        volunteerSelect.value = rating.volunteer_id || '';
+        taskSelect.value = rating.task_id || '';
+        document.getElementById('rating-score').value = rating.score || '';
+        document.getElementById('rating-comments').value = rating.comments || '';
+    }
+    function closeRatingModal() { ratingModal.style.display = 'none'; }
+    if (cancelRatingBtn) cancelRatingBtn.onclick = closeRatingModal;
+    ratingForm.onsubmit = async function(e) {
+        e.preventDefault();
+        saveRatingBtn.disabled = true;
+        ratingModalMsg.textContent = '';
+        const id = document.getElementById('rating-id').value;
+        const volunteer_id = document.getElementById('rating-volunteer-id').value;
+        const task_id = document.getElementById('rating-task-id').value;
+        const score = parseInt(document.getElementById('rating-score').value);
+        const comments = document.getElementById('rating-comments').value;
+        if (!volunteer_id || !task_id) {
+            ratingModalMsg.textContent = 'Please select a volunteer and a task.';
+            saveRatingBtn.disabled = false;
+            return;
+        }
+        const data = {volunteer_id, task_id, score, comments};
+        try {
+            let resp;
+            if (id) {
+                resp = await fetch(`/ratings/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            } else {
+                resp = await fetch('/ratings/add', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            }
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            closeRatingModal();
+            fetchRatings();
+        } catch (e) { ratingModalMsg.textContent = e.message; }
+        saveRatingBtn.disabled = false;
+    };
+    window.editRating = async function(rating_id) {
+        try {
+            let data = await apiGet('/ratings');
+            const rating = data.find(r => r.rating_id === rating_id);
+            openRatingModal(true, rating);
+        } catch (e) { alert(e.message); }
+    }
+    window.deleteRating = async function(rating_id) {
+        if (!confirm('Delete this rating?')) return;
+        try {
+            const resp = await fetch(`/ratings/${rating_id}`, {method:'DELETE', credentials:'same-origin'});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            fetchRatings();
+        } catch (e) { alert(e.message); }
+    }
+
+    // --- Add Expense Modal Logic (admin/coordinator) ---
+    let expenseTaskOptions = [];
+    async function fetchExpenseTasks() {
+        try {
+            const resp = await fetch('/tasks', {credentials: 'same-origin'});
+            if (!resp.ok) throw new Error('Failed to fetch tasks');
+            expenseTaskOptions = await resp.json();
+        } catch (e) { expenseTaskOptions = []; }
+    }
+    async function openExpenseModal(edit, expense={}) {
+        console.log('Opening Expense Modal', {edit, expense});
+        expenseModal.style.display = 'flex';
+        expenseModalTitle.textContent = edit ? 'Edit Expense' : 'Add Expense';
+        expenseForm.reset();
+        expenseModalMsg.textContent = '';
+        document.getElementById('expense-id').value = expense.expense_id || '';
+        try {
+            await fetchExpenseTasks();
+        } catch (e) {
+            expenseModalMsg.textContent = 'Failed to load tasks.';
+        }
+        const taskSelect = document.getElementById('expense-task-id');
+        taskSelect.innerHTML = expenseTaskOptions.map(t => `<option value="${t.task_id}">${t.title} (${t.task_id})</option>`).join('');
+        taskSelect.value = expense.task_id || '';
+        document.getElementById('expense-amount').value = expense.amount || '';
+        document.getElementById('expense-category').value = expense.category || '';
+    }
+    function closeExpenseModal() { expenseModal.style.display = 'none'; }
+    if (cancelExpenseBtn) cancelExpenseBtn.onclick = closeExpenseModal;
+    expenseForm.onsubmit = async function(e) {
+        e.preventDefault();
+        saveExpenseBtn.disabled = true;
+        expenseModalMsg.textContent = '';
+        const id = document.getElementById('expense-id').value;
+        const task_id = document.getElementById('expense-task-id').value;
+        const amount = document.getElementById('expense-amount').value;
+        const category = document.getElementById('expense-category').value;
+        if (!task_id) {
+            expenseModalMsg.textContent = 'Please select a task.';
+            saveExpenseBtn.disabled = false;
+            return;
+        }
+        const data = {task_id, amount, category};
+        try {
+            let resp;
+            if (id) {
+                resp = await fetch(`/expenses/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            } else {
+                resp = await fetch('/expenses/log', {method:'POST', headers:{'Content-Type':'application/json'}, credentials:'same-origin', body:JSON.stringify(data)});
+            }
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            closeExpenseModal();
+            fetchExpenses();
+        } catch (e) { expenseModalMsg.textContent = e.message; }
+        saveExpenseBtn.disabled = false;
+    };
+    window.editExpense = async function(expense_id) {
+        try {
+            let data = await apiGet('/expenses');
+            const expense = data.find(e => e.expense_id === expense_id);
+            openExpenseModal(true, expense);
+        } catch (e) { alert(e.message); }
+    }
+    window.deleteExpense = async function(expense_id) {
+        if (!confirm('Delete this expense?')) return;
+        try {
+            const resp = await fetch(`/expenses/${expense_id}`, {method:'DELETE', credentials:'same-origin'});
+            if (!resp.ok) throw new Error((await resp.json()).message || 'Error');
+            fetchExpenses();
+        } catch (e) { alert(e.message); }
+    }
+
+    // --- Unify loadTabData for all tabs (force-inserted at end) ---
+    loadTabData = async function(tabId) {
+        if (tabId === 'ratings-tab') return await fetchRatings();
+        if (tabId === 'expenses-tab') return await fetchExpenses();
+        if (tabId === 'myratings-tab') return await loadMyRatings();
+        if (tabId === 'absentees-tab') return await loadAbsentees();
+        if (tabId === 'tasks-tab') return await loadTasks();
+        if (tabId === 'volunteers-tab') return await loadVolunteers();
+        if (tabId === 'attendance-tab') return await loadAttendance();
+        if (tabId === 'reports-tab') return await loadReports();
+        if (tabId === 'profile-tab') return await loadProfile();
+        if (tabId === 'users-tab') return await fetchUsers();
+        // fallback: do nothing
+    };
+    // Add this helper to load absentees table for admin
+    async function loadAbsenteesTable() {
+        const el = document.getElementById('absentees-table-container');
+        showLoading(el);
+        let absentees = [];
+        try {
+            // Use correct endpoint for each role
+            let endpoint = '/absentees';
+            if (USER_ROLE === 'admin' || USER_ROLE === 'coordinator') endpoint = '/attendance/absentees';
+            absentees = await apiGet(endpoint);
+            if (!Array.isArray(absentees)) throw new Error('Invalid response');
+            if (!absentees.length) {
+                el.innerHTML = '<div style="color:#888;">No absentees found.</div>';
+                return;
+            }
+            // For each absentee, show a Mark Absent button for each assigned task
+            let html = `<table class='dashboard-table report-table'><thead><tr><th>User</th><th>Role</th><th>Assigned Task(s)</th><th>Action</th></tr></thead><tbody>`;
+            for (const a of absentees) {
+                // Find all tasks assigned to this user
+                const assignedTasks = Object.values(window.allTasks || {}).filter(t => t.assigned_to === a.user_id);
+                if (assignedTasks.length === 0) {
+                    html += `<tr><td>${a.name}</td><td>${a.role}</td><td><i>None</i></td><td>-</td></tr>`;
+                } else {
+                    assignedTasks.forEach((task, idx) => {
+                        html += `<tr><td>${a.name}</td><td>${a.role}</td><td>${task.title}</td><td><button class='btn-primary' onclick='openMarkAbsentModal("${a.user_id}")'>Mark Absent</button></td></tr>`;
+                    });
+                }
+            }
+            html += `</tbody></table>`;
+            el.innerHTML = html;
+        } catch (e) {
+            showError(el, 'Could not load absentees. Check backend endpoint.');
+        }
+    }
+    // Helper to fetch all tasks and cache in window.allTasks
+    window.fetchAllTasksForAbsentees = async function() {
+        try {
+            const resp = await apiGet('/tasks');
+            window.allTasks = {};
+            resp.forEach(t => { window.allTasks[t.task_id] = t; });
+        } catch (e) { window.allTasks = {}; }
+    }
+    // Mark absent handler
+    window.markAbsentForUser = async function(user_id, task_id) {
+        const date = (new Date()).toISOString().slice(0,10);
+        try {
+            const resp = await fetch('/attendance/mark_absent', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'same-origin',
+                body: JSON.stringify({user_id, task_id, date})
+            });
+            if (!resp.ok) {
+                const data = await resp.json();
+                alert(data.message || 'Failed to mark absent');
+            } else {
+                alert('Marked absent successfully');
+                await loadAbsenteesTable();
+            }
+        } catch (e) { alert('Failed to mark absent'); }
+    }
+    // Patch loadAbsenteesTable to always fetch tasks first
+    const origLoadAbsenteesTable = loadAbsenteesTable;
+    loadAbsenteesTable = async function() {
+        await window.fetchAllTasksForAbsentees();
+        await origLoadAbsenteesTable();
+    }
+
+    // Add modal for marking absent
+    if (!document.getElementById('mark-absent-modal')) {
+        const modal = document.createElement('div');
+        modal.id = 'mark-absent-modal';
+        modal.style = 'display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.18);z-index:1000;align-items:center;justify-content:center;';
+        modal.innerHTML = `<div style="background:#fff;padding:32px 24px;border-radius:10px;min-width:320px;max-width:90vw;box-shadow:0 2px 16px 0 rgba(0,0,0,0.12);position:relative;">
+            <h3 style='margin-bottom:18px;'>Mark Absent</h3>
+            <form id='mark-absent-form'>
+                <input type='hidden' id='absent-user-id' />
+                <div style='margin-bottom:12px;'>
+                    <label>Task:</label>
+                    <select class='form-input' id='absent-task-id' required></select>
+                </div>
+                <div style='margin-bottom:12px;'>
+                    <label>Date:</label>
+                    <input class='form-input' id='absent-date' type='date' required />
+                </div>
+                <div style='display:flex;gap:12px;justify-content:flex-end;'>
+                    <button type='button' class='btn-primary' id='cancel-absent-btn' style='background:#bbb;'>Cancel</button>
+                    <button type='submit' class='btn-primary'>Mark Absent</button>
+                </div>
+            </form>
+            <div id='absent-modal-msg' style='margin-top:10px;'></div>
+        </div>`;
+        document.body.appendChild(modal);
+    }
+    // Open modal handler
+    window.openMarkAbsentModal = function(user_id) {
+        const modal = document.getElementById('mark-absent-modal');
+        const userTasks = Object.values(window.allTasks || {}).filter(t => t.assigned_to === user_id);
+        const taskSelect = document.getElementById('absent-task-id');
+        taskSelect.innerHTML = userTasks.map(t => `<option value='${t.task_id}'>${t.title}</option>`).join('');
+        document.getElementById('absent-user-id').value = user_id;
+        document.getElementById('absent-date').value = (new Date()).toISOString().slice(0,10);
+        document.getElementById('absent-modal-msg').textContent = '';
+        modal.style.display = 'flex';
+    }
+    document.getElementById('cancel-absent-btn').onclick = function() {
+        document.getElementById('mark-absent-modal').style.display = 'none';
+    };
+    document.getElementById('mark-absent-form').onsubmit = async function(e) {
+        e.preventDefault();
+        const user_id = document.getElementById('absent-user-id').value;
+        const task_id = document.getElementById('absent-task-id').value;
+        const date = document.getElementById('absent-date').value;
+        const msgEl = document.getElementById('absent-modal-msg');
+        msgEl.textContent = '';
+        try {
+            const resp = await fetch('/attendance/mark_absent', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'same-origin',
+                body: JSON.stringify({user_id, task_id, date})
+            });
+            if (!resp.ok) {
+                const data = await resp.json();
+                msgEl.textContent = data.message || 'Failed to mark absent';
+            } else {
+                msgEl.textContent = 'Marked absent successfully';
+                setTimeout(() => {
+                    document.getElementById('mark-absent-modal').style.display = 'none';
+                    loadAbsenteesTable();
+                }, 800);
+            }
+        } catch (e) { msgEl.textContent = 'Failed to mark absent'; }
+    };
+    </script>
+    <script src="/static/js/script.js"></script>
+</body>
+</html>

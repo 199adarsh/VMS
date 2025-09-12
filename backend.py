@@ -5,6 +5,8 @@ from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_super_secret_key' # Change this in a real application
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False
 
 # --- Conceptual Database (In-memory Dictionaries) ---
 users = {
@@ -49,10 +51,13 @@ def role_required(allowed_roles):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if 'user_id' not in session:
+                print('DEBUG: No user_id in session')
                 return jsonify({"message": "Unauthorized: Login required"}), 401
             current_user_id = session['user_id']
             user_data = next((u for u_id, u in users.items() if u_id == current_user_id), None)
+            print(f'DEBUG: user_id={current_user_id}, session_role={session.get("role")}, user_data_role={user_data["role"] if user_data else None}, allowed_roles={allowed_roles}')
             if not user_data or user_data['role'] not in allowed_roles:
+                print('DEBUG: Forbidden - insufficient permissions')
                 return jsonify({"message": "Forbidden: Insufficient permissions"}), 403
             return f(*args, **kwargs)
         return decorated_function
@@ -63,6 +68,11 @@ def role_required(allowed_roles):
 # app.register_blueprint(vol_bp)
 
 # --- UI Route ---
+@app.context_processor
+def inject_current_user():
+    user = users.get(session['user_id']) if 'user_id' in session else None
+    return dict(current_user=user)
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -71,10 +81,10 @@ def index():
 def home():
     return render_template('index.html')
 
-@app.route('/coordinator/dashboard')
-@role_required(['coordinator'])
-def coordinator_dashboard():
-    return render_template('index.html')
+@app.route('/dashbords')
+@login_required
+def dashbords():
+    return render_template('dashbords.html')
 
 # --- Authentication Endpoints ---
 
@@ -93,7 +103,7 @@ def login():
     if user:
         session['user_id'] = user['user_id']
         session['role'] = user['role']
-        return jsonify({"message": "Login successful", "role": user['role'], "redirect_to": f"/{user['role']}/dashboard"}), 200
+        return jsonify({"message": "Login successful", "role": user['role'], "redirect_to": "/dashbords"}), 200
     return jsonify({"message": "Invalid credentials"}), 401
 
 @app.route('/logout', methods=['POST'])
@@ -160,6 +170,9 @@ def volunteer_submit_attendance():
     if tasks.get(task_id).get('assigned_to') != current_user_id:
         return jsonify({"message": "You can only submit attendance for tasks assigned to you."}), 403
 
+    # Prevent duplicate attendance for same user, task, date
+    if any(log for log in attendance_logs if log['user_id'] == current_user_id and log['task_id'] == task_id and log['date'] == date):
+        return jsonify({"message": "Attendance already submitted for this task and date."}), 409
 
     new_log_id = f"att{uuid.uuid4().hex[:8]}"
     attendance_logs.append({"log_id": new_log_id, "user_id": current_user_id, "task_id": task_id, "date": date})
@@ -213,7 +226,7 @@ def update_personal_profile():
 @app.route('/volunteers', methods=['GET'])
 @role_required(['coordinator'])
 def get_volunteers():
-    volunteer_list = [{"user_id": uid, "name": u['name']} for uid, u in users.items() if u['role'] == 'volunteer']
+    volunteer_list = [{"user_id": uid, "name": u['name'], "email": u['email'], "contact": u.get('contact', '')} for uid, u in users.items() if u['role'] == 'volunteer']
     return jsonify(volunteer_list), 200
 
 @app.route('/tasks/assign_volunteer', methods=['POST'])
@@ -543,8 +556,8 @@ def admin_assign_task():
     return jsonify({"message": "Task assigned successfully by admin", "task": task}), 200
 
 @app.route('/tasks', methods=['GET'])
-@role_required(['coordinator'])
-def coordinator_get_all_tasks():
+@role_required(['coordinator', 'admin'])  # Add 'admin' if you want admins to see all tasks
+def get_all_tasks():
     status_filter = request.args.get('status')
     all_tasks = []
     for task_id, task in tasks.items():
@@ -573,24 +586,53 @@ def delete_task(task_id):
         return jsonify({"message": "Task deleted successfully"}), 200
     return jsonify({"message": "Task not found"}), 404
 
+# --- Absentees tracking ---
+absentees_logs = []  # Each entry: {log_id, user_id, task_id, date}
+
 @app.route('/attendance/absentees', methods=['GET'])
 @role_required(['admin'])
 def get_absentees():
-    # For simplicity, absentees are volunteers who haven't logged attendance today for any assigned task
     today_date = datetime.now().strftime("%Y-%m-%d")
-    volunteers_who_logged_today = {log['user_id'] for log in attendance_logs if log['date'] == today_date}
+    # Get all users who are volunteers or coordinators and have an assigned task
+    all_users = {uid for uid, u in users.items() if u['role'] in ['volunteer', 'coordinator']}
+    assigned_users = {task['assigned_to'] for task in tasks.values() if task.get('assigned_to')}
+    relevant_users = all_users & assigned_users
+    # Who logged attendance today?
+    users_who_logged_today = {log['user_id'] for log in attendance_logs if log['date'] == today_date}
+    # Who is marked absent today?
+    users_marked_absent_today = {log['user_id'] for log in absentees_logs if log['date'] == today_date}
+    # Absentees: assigned users who neither logged attendance nor were marked absent
+    absentees = []
+    for uid in relevant_users:
+        if uid not in users_who_logged_today and uid not in users_marked_absent_today:
+            user = users[uid]
+            absentees.append({
+                "user_id": uid,
+                "name": user['name'],
+                "email": user['email'],
+                "role": user['role']
+            })
+    return jsonify(absentees), 200
 
-    all_volunteers = {uid for uid, u in users.items() if u['role'] == 'volunteer'}
-    absent_volunteers_ids = all_volunteers - volunteers_who_logged_today
-
-    absent_volunteers_details = []
-    for vol_id in absent_volunteers_ids:
-        absent_volunteers_details.append({
-            "user_id": vol_id,
-            "name": users[vol_id]['name'],
-            "email": users[vol_id]['email']
-        })
-    return jsonify(absent_volunteers_details), 200
+@app.route('/attendance/mark_absent', methods=['POST'])
+@role_required(['admin', 'coordinator'])
+def mark_user_absent():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    task_id = data.get('task_id')
+    date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
+    if not user_id or not task_id:
+        return jsonify({"message": "User ID and Task ID are required."}), 400
+    if user_id not in users:
+        return jsonify({"message": "Invalid User ID."}), 400
+    if not tasks.get(task_id):
+        return jsonify({"message": "Invalid Task ID."}), 400
+    # Prevent duplicate absent marking for same user, task, date
+    if any(log for log in absentees_logs if log['user_id'] == user_id and log['task_id'] == task_id and log['date'] == date):
+        return jsonify({"message": "User already marked absent for this task and date."}), 409
+    new_log_id = f"abs{uuid.uuid4().hex[:8]}"
+    absentees_logs.append({"log_id": new_log_id, "user_id": user_id, "task_id": task_id, "date": date})
+    return jsonify({"message": "User marked absent successfully", "log_id": new_log_id}), 201
 
 @app.route('/ratings/<rating_id>', methods=['DELETE'])
 @role_required(['admin'])
@@ -626,8 +668,9 @@ def log_expense():
     return jsonify({"message": "Expense logged successfully", "expense_id": new_expense_id}), 201
 
 @app.route('/expenses/<expense_id>', methods=['PUT'])
-@role_required(['admin'])
+@role_required(['admin', 'coordinator'])  # Add 'coordinator' here
 def update_expense(expense_id):
+    # Optionally, add logic to restrict which expenses a coordinator can edit
     expense = next((e for e in expenses if e.get('expense_id') == expense_id), None)
     if not expense:
         return jsonify({"message": "Expense not found"}), 404
@@ -817,6 +860,134 @@ def admin_dashboard_summary():
         "tasks": all_tasks,
         "team": team
     })
+
+@app.route('/attendance/mark', methods=['POST'])
+@role_required(['coordinator', 'admin'])
+def mark_attendance_for_user():
+    data = request.get_json()
+    user_id = data.get('user_id')
+    task_id = data.get('task_id')
+    date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
+
+    if not user_id or not task_id:
+        return jsonify({"message": "User ID and Task ID are required."}), 400
+    if user_id not in users:
+        return jsonify({"message": "Invalid User ID."}), 400
+    if not tasks.get(task_id):
+        return jsonify({"message": "Invalid Task ID."}), 400
+
+    # Prevent duplicate attendance for same user, task, date
+    if any(log for log in attendance_logs if log['user_id'] == user_id and log['task_id'] == task_id and log['date'] == date):
+        return jsonify({"message": "Attendance already submitted for this user, task, and date."}), 409
+
+    new_log_id = f"att{uuid.uuid4().hex[:8]}"
+    attendance_logs.append({"log_id": new_log_id, "user_id": user_id, "task_id": task_id, "date": date})
+    return jsonify({"message": "Attendance marked successfully", "log_id": new_log_id}), 201
+
+# --- FILTER ENDPOINTS FOR UI ---
+
+@app.route('/attendance/filter', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def filter_attendance():
+    user_id = request.args.get('user_id')
+    task_id = request.args.get('task_id')
+    date = request.args.get('date')
+    filtered = attendance_logs
+    if user_id:
+        filtered = [a for a in filtered if a['user_id'] == user_id]
+    if task_id:
+        filtered = [a for a in filtered if a['task_id'] == task_id]
+    if date:
+        filtered = [a for a in filtered if a['date'] == date]
+    return jsonify(filtered), 200
+
+@app.route('/expenses/filter', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def filter_expenses():
+    task_id = request.args.get('task_id')
+    category = request.args.get('category')
+    date = request.args.get('date')
+    filtered = expenses
+    if task_id:
+        filtered = [e for e in filtered if e['task_id'] == task_id]
+    if category:
+        filtered = [e for e in filtered if e['category'] == category]
+    if date:
+        filtered = [e for e in filtered if e.get('date') == date]
+    return jsonify(filtered), 200
+
+@app.route('/ratings/filter', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def filter_ratings():
+    volunteer_id = request.args.get('volunteer_id')
+    task_id = request.args.get('task_id')
+    score = request.args.get('score')
+    comments = request.args.get('comments')
+    filtered = ratings
+    if volunteer_id:
+        filtered = [r for r in filtered if r['volunteer_id'] == volunteer_id]
+    if task_id:
+        filtered = [r for r in filtered if r['task_id'] == task_id]
+    if score:
+        try:
+            score_val = int(score)
+            filtered = [r for r in filtered if r['score'] == score_val]
+        except:
+            pass
+    if comments:
+        filtered = [r for r in filtered if comments.lower() in r.get('comments', '').lower()]
+    return jsonify(filtered), 200
+
+@app.route('/users/filter', methods=['GET'])
+@role_required(['admin'])
+def filter_users():
+    role = request.args.get('role')
+    name = request.args.get('name')
+    filtered = [u for u in users.values()]
+    if role:
+        filtered = [u for u in filtered if u['role'] == role]
+    if name:
+        filtered = [u for u in filtered if name.lower() in u['name'].lower()]
+    # Remove password from output
+    for u in filtered:
+        u.pop('password', None)
+    return jsonify(filtered), 200
+
+@app.route('/tasks/filter', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def filter_tasks():
+    status = request.args.get('status')
+    priority = request.args.get('priority')
+    assigned_to = request.args.get('assigned_to')
+    filtered = []
+    for task_id, t in tasks.items():
+        if status and t.get('status') != status:
+            continue
+        if priority and t.get('priority') != priority:
+            continue
+        if assigned_to and t.get('assigned_to') != assigned_to:
+            continue
+        filtered.append({'task_id': task_id, **t})
+    return jsonify(filtered), 200
+
+@app.route('/volunteers/filter', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def filter_volunteers():
+    role = request.args.get('role')
+    filtered = []
+    for uid, u in users.items():
+        if u['role'] != 'volunteer':
+            continue
+        if role and u['role'] != role:
+            continue
+        filtered.append({
+            'user_id': uid,
+            'name': u['name'],
+            'email': u['email'],
+            'contact': u.get('contact', ''),
+            'role': u['role']
+        })
+    return jsonify(filtered), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -1,3 +1,4 @@
+console.log('script.js loaded');
 const API_BASE_URL = 'http://127.0.0.1:5000'; // Make sure this matches your Flask backend URL
 
 // --- DOM Elements ---
@@ -13,10 +14,6 @@ const tabContents = document.querySelectorAll('.tab-content');
 
 // Volunteer Specific Elements
 const assignedTasksList = document.getElementById('assigned-tasks-list');
-const submitAttendanceForm = document.getElementById('submit-attendance-form');
-const attendanceTaskIdSelect = document.getElementById('attendance-task-id');
-const attendanceDateInput = document.getElementById('attendance-date');
-const attendanceMessage = document.getElementById('attendance-message');
 const myAttendanceHistory = document.getElementById('my-attendance-history');
 const myRatingsList = document.getElementById('my-ratings-list');
 const updateProfileForm = document.getElementById('update-profile-form');
@@ -162,15 +159,13 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
     return responseData;
 }
 
-/**
- * Checks if user is logged in and updates UI accordingly.
- */
+
 async function checkSession() {
     try {
         const sessionData = await apiRequest('/session/check', 'GET');
         if (sessionData.logged_in) {
-            loginSection.classList.add('hidden');
-            dashboardSection.classList.remove('hidden');
+            if (loginSection) loginSection.classList.add('hidden');
+            if (dashboardSection) dashboardSection.classList.remove('hidden');
             updateUIForRole(sessionData.role);
             await loadUserProfile();
         }
@@ -201,12 +196,8 @@ function logout() {
         clearInterval(dashboardAutoRefreshInterval);
         dashboardAutoRefreshInterval = null;
     }
-    loginSection.classList.remove('hidden');
-    dashboardSection.classList.add('hidden');
-    tabContents.forEach(content => content.classList.add('hidden'));
-    loginForm.reset();
-    userNameSpan.textContent = '';
-    userRoleSpan.textContent = '';
+    if (loginSection) loginSection.classList.remove('hidden');
+    if (dashboardSection) dashboardSection.classList.add('hidden');
 }
 
 /**
@@ -214,96 +205,38 @@ function logout() {
  * @param {string} role The user's role.
  */
 function updateUIForRole(role) {
-    // Clear all tabs first
-    dashboardTabs.innerHTML = '';
-    tabContents.forEach(content => content.classList.add('hidden'));
+    // Hide all tab buttons and tab-content by default
+    document.querySelectorAll('.tab-button').forEach(btn => btn.style.display = 'none');
+    document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
 
-    if (role === 'volunteer') {
-        setupVolunteerTabs();
+    // Show tabs/content based on role
+    if (role === 'admin') {
+        showTabs(['tasks-tab', 'attendance-tab', 'ratings-tab', 'expenses-tab', 'reports-tab', 'profile-tab', 'logout-tab']);
     } else if (role === 'coordinator') {
-        setupCoordinatorTabs();
-    } else if (role === 'admin') {
-        setupAdminTabs();
+        showTabs(['tasks-tab', 'attendance-tab', 'ratings-tab', 'profile-tab', 'logout-tab']);
+    } else if (role === 'volunteer') {
+        showTabs(['tasks-tab', 'attendance-tab', 'profile-tab', 'logout-tab']);
+    }
+
+    // Always show the first visible tab by default
+    const firstVisibleTabBtn = Array.from(document.querySelectorAll('.tab-button')).find(btn => btn.style.display !== 'none');
+    if (firstVisibleTabBtn) {
+        firstVisibleTabBtn.classList.add('active');
+        const tabId = firstVisibleTabBtn.getAttribute('data-tab');
+        if (tabId) {
+            document.getElementById(tabId).style.display = '';
+        }
     }
 }
 
-/**
- * Sets up tabs for volunteer role.
- */
-function setupVolunteerTabs() {
-    const tabs = [
-        { id: 'volunteer-assigned-tasks', label: 'My Tasks' },
-        { id: 'volunteer-attendance', label: 'Attendance' },
-        { id: 'volunteer-ratings', label: 'My Ratings' },
-        { id: 'volunteer-profile', label: 'Profile' }
-    ];
-
-    tabs.forEach(tab => {
-        const tabButton = document.createElement('button');
-        tabButton.className = 'tab-button';
-        tabButton.textContent = tab.label;
-        tabButton.onclick = () => showTab(tab.id);
-        dashboardTabs.appendChild(tabButton);
+// Helper to show tab buttons and content by id
+function showTabs(tabIds) {
+    tabIds.forEach(tabId => {
+        const btn = document.querySelector(`.tab-button[data-tab="${tabId}"]`);
+        const tab = document.getElementById(tabId);
+        if (btn) btn.style.display = '';
+        if (tab) tab.style.display = '';
     });
-
-    // Show first tab by default
-    if (tabs.length > 0) {
-        showTab(tabs[0].id);
-    }
-}
-
-/**
- * Sets up tabs for coordinator role.
- */
-function setupCoordinatorTabs() {
-    const tabs = [
-        { id: 'coordinator-assign-tasks', label: 'Assign Tasks' },
-        { id: 'coordinator-attendance', label: 'Attendance' },
-        { id: 'coordinator-ratings', label: 'Ratings' },
-        { id: 'coordinator-expenses', label: 'Expenses' },
-        { id: 'coordinator-reports', label: 'Reports' },
-        { id: 'tasks-tab', label: 'Tasks' }
-    ];
-
-    tabs.forEach(tab => {
-        const tabButton = document.createElement('button');
-        tabButton.className = 'tab-button';
-        tabButton.textContent = tab.label;
-        tabButton.onclick = () => showTab(tab.id);
-        dashboardTabs.appendChild(tabButton);
-    });
-
-    // Show first tab by default
-    if (tabs.length > 0) {
-        showTab(tabs[0].id);
-    }
-}
-
-/**
- * Sets up tabs for admin role.
- */
-function setupAdminTabs() {
-    const tabs = [
-        { id: 'admin-users', label: 'Users' },
-        { id: 'tasks-tab', label: 'Tasks' },
-        { id: 'admin-attendance', label: 'Attendance' },
-        { id: 'admin-ratings', label: 'Ratings' },
-        { id: 'admin-expenses', label: 'Expenses' },
-        { id: 'admin-reports', label: 'Reports' }
-    ];
-
-    tabs.forEach(tab => {
-        const tabButton = document.createElement('button');
-        tabButton.className = 'tab-button';
-        tabButton.textContent = tab.label;
-        tabButton.onclick = () => showTab(tab.id);
-        dashboardTabs.appendChild(tabButton);
-    });
-
-    // Show first tab by default
-    if (tabs.length > 0) {
-        showTab(tabs[0].id);
-    }
 }
 
 let dashboardAutoRefreshInterval = null;
@@ -354,7 +287,6 @@ async function loadTabData(tabId) {
         if (tabId === 'volunteer-assigned-tasks') {
             await fetchAssignedTasks();
         } else if (tabId === 'volunteer-attendance') {
-            await populateAttendanceTaskSelect();
             await fetchMyAttendance();
         } else if (tabId === 'volunteer-ratings') {
             await fetchMyRatings();
@@ -393,30 +325,34 @@ async function loadTabData(tabId) {
 // --- Event Listeners ---
 
 // Login form submission
-loginForm.addEventListener('submit', async (e) => {
+if (loginForm) {
+  loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    
+    const email = loginForm.email.value;
+    const password = loginForm.password.value;
     try {
-        const data = await apiRequest('/login', 'POST', { email, password });
-        showMessage(loginMessage, data.message, 'success');
-        await checkSession();
+      const response = await apiRequest('/login', 'POST', { email, password });
+      if (response && response.redirect_to) {
+        window.location.href = response.redirect_to;
+      }
     } catch (error) {
-        showMessage(loginMessage, error.message, 'error');
+      showMessage(loginMessage, error.message, 'error');
     }
-});
+  });
+}
 
 // Logout button
-logoutButton.addEventListener('click', async () => {
+if (logoutButton) {
+  logoutButton.addEventListener('click', async () => {
     try {
-        await apiRequest('/logout', 'POST');
+      await apiRequest('/logout', 'POST');
     } catch (error) {
-        console.error('Logout error:', error);
+      console.error('Logout error:', error);
     } finally {
-        logout();
+      logout();
     }
-});
+  });
+}
 
 // --- Volunteer Functions ---
 
@@ -535,85 +471,72 @@ async function fetchProfile() {
     }
 }
 
-updateProfileForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = profileNameInput.value;
-    const email = profileEmailInput.value;
-    const contact = profileContactInput.value;
-    const newPassword = profileNewPasswordInput.value;
+if (updateProfileForm) {
+    updateProfileForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = profileNameInput.value;
+        const email = profileEmailInput.value;
+        const contact = profileContactInput.value;
+        const newPassword = profileNewPasswordInput.value;
 
-    const updateData = { name, email, contact };
-    if (newPassword) {
-        updateData.new_password = newPassword;
-    }
+        const updateData = { name, email, contact };
+        if (newPassword) {
+            updateData.new_password = newPassword;
+        }
 
-    try {
-        const result = await apiRequest('/profile/update', 'PUT', updateData);
-        showMessage(profileMessage, result.message, 'success');
-        profileNewPasswordInput.value = ''; // Clear password field after update
-        // Re-fetch profile to ensure UI is consistent with backend
-        fetchProfile();
-    } catch (error) {
-        showMessage(profileMessage, error.message, 'error');
-    }
-});
+        try {
+            const result = await apiRequest('/profile/update', 'PUT', updateData);
+            showMessage(profileMessage, result.message, 'success');
+            profileNewPasswordInput.value = ''; // Clear password field after update
+            // Re-fetch profile to ensure UI is consistent with backend
+            fetchProfile();
+        } catch (error) {
+            showMessage(profileMessage, error.message, 'error');
+        }
+    });
+}
 
 // --- Coordinator Functions ---
 
-// Submit attendance form
-submitAttendanceForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const taskId = attendanceTaskIdSelect.value;
-    const date = attendanceDateInput.value;
 
-    try {
-        await apiRequest('/attendance/submit', 'POST', { task_id: taskId, date });
-        showMessage(attendanceMessage, 'Attendance submitted successfully!', 'success');
-        submitAttendanceForm.reset();
-        await fetchMyAttendance(); // Refresh attendance history
-    } catch (error) {
-        showMessage(attendanceMessage, error.message, 'error');
-    }
-});
 
 // Assign task form
-assignTaskForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const taskId = assignTaskIdSelect.value;
-    const volunteerId = assignVolunteerIdSelect.value;
-    const priority = assignPrioritySelect.value;
-    const deadline = assignDeadlineInput.value;
+if (assignTaskForm) {
+    assignTaskForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const taskId = assignTaskIdSelect.value;
+        const volunteerId = assignVolunteerIdSelect.value;
+        const priority = assignPrioritySelect.value;
+        const deadline = assignDeadlineInput.value;
 
-    try {
-        await apiRequest('/tasks/assign_volunteer', 'POST', {
-            task_id: taskId,
-            volunteer_id: volunteerId,
-            priority,
-            deadline
-        });
-        showMessage(assignTaskMessage, 'Task assigned successfully!', 'success');
-        assignTaskForm.reset();
-    } catch (error) {
-        showMessage(assignTaskMessage, error.message, 'error');
-    }
-});
+        try {
+            const result = await apiRequest('/tasks/assign_volunteer', 'POST', { task_id: taskId, volunteer_id: volunteerId, priority, deadline });
+            showMessage(assignTaskMessage, result.message, 'success');
+            assignTaskForm.reset();
+            populateCoordinatorTaskSelects(); // Refresh tasks
+        } catch (error) {
+            showMessage(assignTaskMessage, error.message, 'error');
+        }
+    });
+}
 
 // Reassign task form
-reassignTaskForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const taskId = reassignTaskSelect.value;
-    const volunteerId = reassignVolunteerIdSelect.value;
+if (reassignTaskForm) {
+    reassignTaskForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const taskId = reassignTaskSelect.value;
+        const newVolunteerId = reassignVolunteerIdSelect.value;
 
-    try {
-        await apiRequest(`/tasks/reassign_volunteer/${taskId}`, 'PUT', {
-            volunteer_id: volunteerId
-        });
-        showMessage(reassignTaskMessage, 'Task reassigned successfully!', 'success');
-        reassignTaskForm.reset();
-    } catch (error) {
-        showMessage(reassignTaskMessage, error.message, 'error');
-    }
-});
+        try {
+            const result = await apiRequest(`/tasks/reassign_volunteer/${taskId}`, 'PUT', { volunteer_id: newVolunteerId });
+            showMessage(reassignTaskMessage, result.message, 'success');
+            reassignTaskForm.reset();
+            populateCoordinatorTaskSelects(); // Refresh tasks
+        } catch (error) {
+            showMessage(reassignTaskMessage, error.message, 'error');
+        }
+    });
+}
 
 async function populateVolunteerSelects() {
     try {
@@ -778,34 +701,40 @@ async function fetchCoordinatorAttendance() {
     }
 }
 
-coordAttendanceFilterBtn.addEventListener('click', fetchCoordinatorAttendance);
-coordAttendanceResetBtn.addEventListener('click', () => {
-    coordAttendanceVolunteerFilter.value = '';
-    coordAttendanceDateFilter.value = '';
-    fetchCoordinatorAttendance();
-});
+if (coordAttendanceFilterBtn) {
+    coordAttendanceFilterBtn.addEventListener('click', fetchCoordinatorAttendance);
+}
+if (coordAttendanceResetBtn) {
+    coordAttendanceResetBtn.addEventListener('click', () => {
+        coordAttendanceVolunteerFilter.value = '';
+        coordAttendanceDateFilter.value = '';
+        fetchCoordinatorAttendance();
+    });
+}
 
 async function populateCoordinatorRatingSelects() {
     await populateVolunteerSelects(); // Reuse for volunteer select
     await populateCoordinatorTaskSelects(); // Reuse for task select
 }
 
-submitRatingForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const volunteerId = ratingVolunteerIdSelect.value;
-    const taskId = ratingTaskIdSelect.value;
-    const score = parseInt(ratingScoreInput.value);
-    const comments = ratingCommentsTextarea.value;
+if (submitRatingForm) {
+    submitRatingForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const volunteerId = ratingVolunteerIdSelect.value;
+        const taskId = ratingTaskIdSelect.value;
+        const score = parseInt(ratingScoreInput.value);
+        const comments = ratingCommentsTextarea.value;
 
-    try {
-        const result = await apiRequest('/ratings/add', 'POST', { volunteer_id: volunteerId, task_id: taskId, score, comments });
-        showMessage(submitRatingMessage, result.message, 'success');
-        submitRatingForm.reset();
-        fetchMySubmittedRatings(); // Refresh list
-    } catch (error) {
-        showMessage(submitRatingMessage, error.message, 'error');
-    }
-});
+        try {
+            const result = await apiRequest('/ratings/add', 'POST', { volunteer_id: volunteerId, task_id: taskId, score, comments });
+            showMessage(submitRatingMessage, result.message, 'success');
+            submitRatingForm.reset();
+            fetchMySubmittedRatings(); // Refresh list
+        } catch (error) {
+            showMessage(submitRatingMessage, error.message, 'error');
+        }
+    });
+}
 
 async function fetchMySubmittedRatings() {
     try {
@@ -932,12 +861,16 @@ async function fetchCoordinatorExpenses() {
     }
 }
 
-coordExpenseFilterBtn.addEventListener('click', fetchCoordinatorExpenses);
-coordExpenseResetBtn.addEventListener('click', () => {
-    coordExpenseTaskFilter.value = '';
-    coordExpenseCategoryFilter.value = '';
-    fetchCoordinatorExpenses();
-});
+if (coordExpenseFilterBtn) {
+    coordExpenseFilterBtn.addEventListener('click', fetchCoordinatorExpenses);
+}
+if (coordExpenseResetBtn) {
+    coordExpenseResetBtn.addEventListener('click', () => {
+        coordExpenseTaskFilter.value = '';
+        coordExpenseCategoryFilter.value = '';
+        fetchCoordinatorExpenses();
+    });
+}
 
 async function fetchCoordinatorReports() {
     try {
@@ -1227,11 +1160,15 @@ async function fetchAllTasks() {
     }
 }
 
-adminTaskFilterBtn.addEventListener('click', fetchAllTasks);
-adminTaskResetBtn.addEventListener('click', () => {
-    adminTaskStatusFilter.value = '';
-    fetchAllTasks();
-});
+if (adminTaskFilterBtn) {
+    adminTaskFilterBtn.addEventListener('click', fetchAllTasks);
+}
+if (adminTaskResetBtn) {
+    adminTaskResetBtn.addEventListener('click', () => {
+        adminTaskStatusFilter.value = '';
+        fetchAllTasks();
+    });
+}
 
 function openEditTaskModal(task) {
     const newTitle = prompt(`Edit title for ${task.title} (current: ${task.title}):`, task.title);
@@ -1320,12 +1257,16 @@ async function fetchAdminAttendance() {
     }
 }
 
-adminAttendanceFilterBtn.addEventListener('click', fetchAdminAttendance);
-adminAttendanceResetBtn.addEventListener('click', () => {
-    adminAttendanceVolunteerFilter.value = '';
-    adminAttendanceDateFilter.value = '';
-    fetchAdminAttendance();
-});
+if (adminAttendanceFilterBtn) {
+    adminAttendanceFilterBtn.addEventListener('click', fetchAdminAttendance);
+}
+if (adminAttendanceResetBtn) {
+    adminAttendanceResetBtn.addEventListener('click', () => {
+        adminAttendanceVolunteerFilter.value = '';
+        adminAttendanceDateFilter.value = '';
+        fetchAdminAttendance();
+    });
+}
 
 getAbsenteesBtn.addEventListener('click', fetchAbsentees);
 async function fetchAbsentees() {
@@ -1349,22 +1290,24 @@ async function fetchAbsentees() {
     }
 }
 
-adminSubmitRatingForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const volunteerId = adminRatingVolunteerIdSelect.value;
-    const taskId = adminRatingTaskIdSelect.value;
-    const score = parseInt(adminRatingScoreInput.value);
-    const comments = adminRatingCommentsTextarea.value;
+if (adminSubmitRatingForm) {
+    adminSubmitRatingForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const volunteerId = adminRatingVolunteerIdSelect.value;
+        const taskId = adminRatingTaskIdSelect.value;
+        const score = parseInt(adminRatingScoreInput.value);
+        const comments = adminRatingCommentsTextarea.value;
 
-    try {
-        const result = await apiRequest('/ratings/add', 'POST', { volunteer_id: volunteerId, task_id: taskId, score, comments });
-        showMessage(adminSubmitRatingMessage, result.message, 'success');
-        adminSubmitRatingForm.reset();
-        fetchAllRatings(); // Refresh list
-    } catch (error) {
-        showMessage(adminSubmitRatingMessage, error.message, 'error');
-    }
-});
+        try {
+            const result = await apiRequest('/ratings/add', 'POST', { volunteer_id: volunteerId, task_id: taskId, score, comments });
+            showMessage(adminSubmitRatingMessage, result.message, 'success');
+            adminSubmitRatingForm.reset();
+            fetchAllRatings(); // Refresh list
+        } catch (error) {
+            showMessage(adminSubmitRatingMessage, error.message, 'error');
+        }
+    });
+}
 
 async function fetchAllRatings() {
     try {
@@ -1508,12 +1451,16 @@ async function fetchAllExpenses() {
     }
 }
 
-adminExpenseFilterBtn.addEventListener('click', fetchAllExpenses);
-adminExpenseResetBtn.addEventListener('click', () => {
-    adminExpenseTaskFilter.value = '';
-    adminExpenseCategoryFilter.value = '';
-    fetchAllExpenses();
-});
+if (adminExpenseFilterBtn) {
+    adminExpenseFilterBtn.addEventListener('click', fetchAllExpenses);
+}
+if (adminExpenseResetBtn) {
+    adminExpenseResetBtn.addEventListener('click', () => {
+        adminExpenseTaskFilter.value = '';
+        adminExpenseCategoryFilter.value = '';
+        fetchAllExpenses();
+    });
+}
 
 function openEditExpenseModal(expense) {
     const newAmount = prompt(`Edit amount for expense ${expense.expense_id} (current: ${expense.amount}):`, expense.amount);
@@ -1668,22 +1615,7 @@ async function fetchAdminReports() {
     }
 }
 
-async function populateAttendanceTaskSelect() {
-    try {
-        const tasks = await apiRequest('/tasks/assigned', 'GET');
-        attendanceTaskIdSelect.innerHTML = '<option value="">Select a Task</option>';
-        tasks.forEach(task => {
-            if (task.status !== 'Completed') { // Only allow attendance for incomplete tasks
-                const option = document.createElement('option');
-                option.value = task.task_id;
-                option.textContent = `${task.title} (${task.deadline})`;
-                attendanceTaskIdSelect.appendChild(option);
-            }
-        });
-    } catch (error) {
-        attendanceTaskIdSelect.innerHTML = '<option value="">Error loading tasks</option>';
-    }
-}
+
 
 async function loadVolunteerDashboard() {
     const data = await apiRequest('/dashboard/volunteer', 'GET');
@@ -1694,15 +1626,9 @@ async function loadVolunteerDashboard() {
 }
 
 // --- Initial Load ---
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', function() {
     // Check if user is already logged in
-    await checkSession();
-    
-    // Set today's date as default for attendance form
-    const today = new Date().toISOString().split('T')[0];
-    if (attendanceDateInput) {
-        attendanceDateInput.value = today;
-    }
+    checkSession();
 });
 
 // Make functions globally available for onclick handlers
@@ -1822,4 +1748,12 @@ if (document.getElementById('dashboard-section')) {
   updateDashboardActivity();
   setupDashboardQuickActions();
 }
+
+// On dashbords.html, check session and show dashboard if logged in
+if (window.location.pathname.includes('dashbords')) {
+    checkSession();
+}
+
+// ... existing code ...
+window.fetchCoordinatorReports = fetchCoordinatorReports;
 
