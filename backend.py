@@ -1,40 +1,17 @@
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
 import uuid
+import os
 from functools import wraps
 from datetime import datetime
+from database_service import db_service
 
 app = Flask(__name__)
-app.secret_key = 'your_super_secret_key' # Change this in a real application
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your_super_secret_key') # Use environment variable in production
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
 
-# --- Conceptual Database (In-memory Dictionaries) ---
-users = {
-    "v1": {"email": "volunteer1@example.com", "password": "password123", "role": "volunteer", "user_id": "v1", "name": "Volunteer One", "contact": "111-222-3333"},
-    "c1": {"email": "coordinator1@example.com", "password": "password123", "role": "coordinator", "user_id": "c1", "name": "Coordinator One", "contact": "444-555-6666"},
-    "a1": {"email": "admin1@example.com", "password": "password123", "role": "admin", "user_id": "a1", "name": "Admin One", "contact": "777-888-9999"},
-}
-
-tasks = {
-    "t1": {"title": "Cleanup Drive", "description": "Community park cleanup", "deadline": "2025-07-15", "priority": "High", "status": "Pending", "assigned_to": "v1"},
-    "t2": {"title": "Food Distribution", "description": "Distribute food to needy families", "deadline": "2025-07-10", "priority": "Medium", "status": "In Progress", "assigned_to": "v1"},
-    "t3": {"title": "Event Setup", "description": "Set up stage for charity event", "deadline": "2025-07-20", "priority": "High", "status": "Pending", "assigned_to": None},
-    "t4": {"title": "Fundraising Call", "description": "Call potential donors", "deadline": "2025-07-25", "priority": "Medium", "status": "Pending", "assigned_to": None},
-}
-
-attendance_logs = [
-    {"log_id": "att1", "user_id": "v1", "task_id": "t1", "date": "2025-07-05"},
-    {"log_id": "att2", "user_id": "v1", "task_id": "t2", "date": "2025-07-06"},
-]
-
-ratings = [
-    {"rating_id": "r1", "volunteer_id": "v1", "coordinator_id": "c1", "task_id": "t1", "score": 4, "comments": "Good effort on cleanup."},
-]
-
-expenses = [
-    {"expense_id": "e1", "task_id": "t1", "amount": 100, "category": "decoration", "logged_by": "a1"},
-    {"expense_id": "e2", "task_id": "t2", "amount": 50, "category": "food", "logged_by": "a1"},
-]
+# --- Firebase Database Service ---
+# All data operations now go through the database service
 
 # --- Helper Functions and Decorators for Authentication and Authorization ---
 
@@ -54,7 +31,7 @@ def role_required(allowed_roles):
                 print('DEBUG: No user_id in session')
                 return jsonify({"message": "Unauthorized: Login required"}), 401
             current_user_id = session['user_id']
-            user_data = next((u for u_id, u in users.items() if u_id == current_user_id), None)
+            user_data = db_service.get_user(current_user_id)
             print(f'DEBUG: user_id={current_user_id}, session_role={session.get("role")}, user_data_role={user_data["role"] if user_data else None}, allowed_roles={allowed_roles}')
             if not user_data or user_data['role'] not in allowed_roles:
                 print('DEBUG: Forbidden - insufficient permissions')
@@ -70,7 +47,7 @@ def role_required(allowed_roles):
 # --- UI Route ---
 @app.context_processor
 def inject_current_user():
-    user = users.get(session['user_id']) if 'user_id' in session else None
+    user = db_service.get_user(session['user_id']) if 'user_id' in session else None
     return dict(current_user=user)
 
 @app.route('/')
@@ -94,13 +71,9 @@ def login():
     email = data.get('email')
     password = data.get('password')
 
-    user = None
-    for user_id, user_data in users.items():
-        if user_data.get('email') == email and user_data.get('password') == password:
-            user = user_data
-            break
-
-    if user:
+    user = db_service.get_user_by_email(email)
+    
+    if user and user.get('password') == password:
         session['user_id'] = user['user_id']
         session['role'] = user['role']
         return jsonify({"message": "Login successful", "role": user['role'], "redirect_to": "/dashbords"}), 200
@@ -125,7 +98,7 @@ def check_session():
 @role_required(['volunteer'])
 def volunteer_assigned_tasks():
     current_user_id = session['user_id']
-    assigned_tasks = [{"task_id": task_id, **task} for task_id, task in tasks.items() if task.get('assigned_to') == current_user_id]
+    assigned_tasks = db_service.get_tasks_by_assignee(current_user_id)
     # Filter out sensitive information if necessary before sending
     return jsonify(assigned_tasks), 200
 
@@ -133,7 +106,7 @@ def volunteer_assigned_tasks():
 @role_required(['volunteer'])
 def volunteer_view_specific_task(task_id):
     current_user_id = session['user_id']
-    task = tasks.get(task_id)
+    task = db_service.get_task(task_id)
     if task and task.get('assigned_to') == current_user_id:
         return jsonify(task), 200
     return jsonify({"message": "Task not found or not assigned to you"}), 404
@@ -142,7 +115,7 @@ def volunteer_view_specific_task(task_id):
 @role_required(['volunteer'])
 def volunteer_mark_task_completed(task_id):
     current_user_id = session['user_id']
-    task = tasks.get(task_id)
+    task = db_service.get_task(task_id)
     if not task:
         return jsonify({"message": "Task not found"}), 404
     if task.get('assigned_to') != current_user_id:
@@ -151,6 +124,7 @@ def volunteer_mark_task_completed(task_id):
     data = request.get_json()
     new_status = data.get('status')
     if new_status == "Completed":
+        db_service.update_task(task_id, {"status": "Completed"})
         task['status'] = "Completed"
         return jsonify({"message": f"Task {task_id} marked as Completed", "task": task}), 200
     return jsonify({"message": "Invalid status update"}), 400
@@ -165,38 +139,38 @@ def volunteer_submit_attendance():
 
     if not task_id:
         return jsonify({"message": "Task ID is required"}), 400
-    if not tasks.get(task_id):
+    task = db_service.get_task(task_id)
+    if not task:
         return jsonify({"message": "Invalid Task ID"}), 400
-    if tasks.get(task_id).get('assigned_to') != current_user_id:
+    if task.get('assigned_to') != current_user_id:
         return jsonify({"message": "You can only submit attendance for tasks assigned to you."}), 403
 
     # Prevent duplicate attendance for same user, task, date
-    if any(log for log in attendance_logs if log['user_id'] == current_user_id and log['task_id'] == task_id and log['date'] == date):
+    if db_service.check_attendance_exists(current_user_id, task_id, date):
         return jsonify({"message": "Attendance already submitted for this task and date."}), 409
 
-    new_log_id = f"att{uuid.uuid4().hex[:8]}"
-    attendance_logs.append({"log_id": new_log_id, "user_id": current_user_id, "task_id": task_id, "date": date})
+    new_log_id = db_service.create_attendance_log({"log_id": f"att{uuid.uuid4().hex[:8]}", "user_id": current_user_id, "task_id": task_id, "date": date})
     return jsonify({"message": "Attendance submitted successfully", "log_id": new_log_id}), 201
 
 @app.route('/attendance/my', methods=['GET'])
 @role_required(['volunteer'])
 def volunteer_my_attendance():
     current_user_id = session['user_id']
-    my_attendance = [log for log in attendance_logs if log.get('user_id') == current_user_id]
+    my_attendance = db_service.get_attendance_logs(user_id=current_user_id)
     return jsonify(my_attendance), 200
 
 @app.route('/ratings/my', methods=['GET'])
 @role_required(['volunteer'])
 def volunteer_my_ratings():
     current_user_id = session['user_id']
-    my_ratings = [rating for rating in ratings if rating.get('volunteer_id') == current_user_id]
+    my_ratings = db_service.get_ratings(volunteer_id=current_user_id)
     return jsonify(my_ratings), 200
 
 @app.route('/profile', methods=['GET'])
 @role_required(['volunteer', 'coordinator', 'admin'])
 def view_personal_profile():
     current_user_id = session['user_id']
-    user_data = users.get(current_user_id)
+    user_data = db_service.get_user(current_user_id)
     if user_data:
         profile = {k: v for k, v in user_data.items() if k not in ['password']} # Exclude password
         return jsonify(profile), 200
@@ -206,19 +180,20 @@ def view_personal_profile():
 @role_required(['volunteer', 'coordinator', 'admin'])
 def update_personal_profile():
     current_user_id = session['user_id']
-    user_data = users.get(current_user_id)
+    user_data = db_service.get_user(current_user_id)
     if not user_data:
         return jsonify({"message": "User not found"}), 404
 
     data = request.get_json()
-    user_data.update({k: v for k, v in data.items() if k in ['name', 'contact', 'email']}) # Allow specific fields to be updated
+    update_data = {k: v for k, v in data.items() if k in ['name', 'contact', 'email']} # Allow specific fields to be updated
 
     # Optional: Password change functionality
     new_password = data.get('new_password')
     if new_password:
-        user_data['password'] = new_password # In a real app, hash and salt this!
+        update_data['password'] = new_password # In a real app, hash and salt this!
 
-    users[current_user_id] = user_data # Update in our "database"
+    db_service.update_user(current_user_id, update_data) # Update in Firebase
+    user_data.update(update_data) # Update local copy for response
     return jsonify({"message": "Profile updated successfully", "profile": {k: v for k, v in user_data.items() if k not in ['password']}}), 200
 
 # --- COORDINATOR ROLE ENDPOINTS ---
@@ -226,7 +201,8 @@ def update_personal_profile():
 @app.route('/volunteers', methods=['GET'])
 @role_required(['coordinator'])
 def get_volunteers():
-    volunteer_list = [{"user_id": uid, "name": u['name'], "email": u['email'], "contact": u.get('contact', '')} for uid, u in users.items() if u['role'] == 'volunteer']
+    volunteers = db_service.get_users_by_role('volunteer')
+    volunteer_list = [{"user_id": u['user_id'], "name": u['name'], "email": u['email'], "contact": u.get('contact', '')} for u in volunteers]
     return jsonify(volunteer_list), 200
 
 @app.route('/tasks/assign_volunteer', methods=['POST'])
@@ -241,19 +217,22 @@ def assign_task_to_volunteer():
     if not all([task_id, volunteer_id]):
         return jsonify({"message": "Task ID and Volunteer ID are required"}), 400
 
-    task = tasks.get(task_id)
-    volunteer = users.get(volunteer_id)
+    task = db_service.get_task(task_id)
+    volunteer = db_service.get_user(volunteer_id)
 
     if not task or not volunteer:
         return jsonify({"message": "Invalid Task or Volunteer ID"}), 404
     if volunteer['role'] != 'volunteer':
         return jsonify({"message": "Cannot assign tasks to non-volunteers"}), 403
 
-    task['assigned_to'] = volunteer_id
+    update_data = {'assigned_to': volunteer_id}
     if priority:
-        task['priority'] = priority
+        update_data['priority'] = priority
     if deadline:
-        task['deadline'] = deadline
+        update_data['deadline'] = deadline
+
+    db_service.update_task(task_id, update_data)
+    task.update(update_data)
 
     return jsonify({"message": "Task assigned successfully", "task": task}), 200
 
@@ -263,14 +242,15 @@ def reassign_task_to_volunteer(task_id):
     data = request.get_json()
     new_volunteer_id = data.get('volunteer_id')
 
-    task = tasks.get(task_id)
+    task = db_service.get_task(task_id)
     if not task:
         return jsonify({"message": "Task not found"}), 404
 
-    new_volunteer = users.get(new_volunteer_id)
+    new_volunteer = db_service.get_user(new_volunteer_id)
     if not new_volunteer or new_volunteer['role'] != 'volunteer':
         return jsonify({"message": "Invalid new Volunteer ID"}), 400
 
+    db_service.update_task(task_id, {'assigned_to': new_volunteer_id})
     task['assigned_to'] = new_volunteer_id
     return jsonify({"message": "Task reassigned successfully", "task": task}), 200
 
@@ -280,17 +260,17 @@ def get_attendance_logs():
     volunteer_id = request.args.get('volunteer_id')
     date_filter = request.args.get('date') # Example: YYYY-MM-DD
 
-    filtered_logs = attendance_logs
     if volunteer_id:
         # Coordinators can only see attendance for volunteers. Admins see all.
         if session['role'] == 'coordinator':
             # In a real system, you'd check if the coordinator "supervises" this volunteer.
             # For this example, we'll assume a coordinator can view any volunteer's attendance.
-            if users.get(volunteer_id) and users.get(volunteer_id)['role'] != 'volunteer':
+            volunteer = db_service.get_user(volunteer_id)
+            if volunteer and volunteer['role'] != 'volunteer':
                 return jsonify({"message": "Coordinators can only view volunteer attendance"}), 403
-        filtered_logs = [log for log in filtered_logs if log.get('user_id') == volunteer_id]
-    if date_filter:
-        filtered_logs = [log for log in filtered_logs if log.get('date') == date_filter]
+        filtered_logs = db_service.get_attendance_logs(user_id=volunteer_id, date=date_filter)
+    else:
+        filtered_logs = db_service.get_attendance_logs(date=date_filter)
 
     return jsonify(filtered_logs), 200
 
@@ -309,8 +289,8 @@ def add_rating():
     if not isinstance(score, (int, float)) or not (1 <= score <= 5):
         return jsonify({"message": "Score must be between 1 and 5"}), 400
 
-    volunteer = users.get(volunteer_id)
-    task = tasks.get(task_id)
+    volunteer = db_service.get_user(volunteer_id)
+    task = db_service.get_task(task_id)
 
     if not volunteer or volunteer['role'] != 'volunteer':
         return jsonify({"message": "Invalid Volunteer ID"}), 400
@@ -323,16 +303,16 @@ def add_rating():
         if task.get('assigned_to') != volunteer_id:
             return jsonify({"message": "Forbidden: Cannot rate volunteers not assigned to this task"}), 403
 
-    new_rating_id = f"r{uuid.uuid4().hex[:8]}"
-    ratings.append({
-        "rating_id": new_rating_id,
+    rating_data = {
+        "rating_id": f"r{uuid.uuid4().hex[:8]}",
         "volunteer_id": volunteer_id,
         "coordinator_id": current_user_id if session['role'] == 'coordinator' else None, # Only coordinators log this
         "admin_id": current_user_id if session['role'] == 'admin' else None, # Only admins log this
         "task_id": task_id,
         "score": score,
         "comments": comments
-    })
+    }
+    new_rating_id = db_service.create_rating(rating_data)
     return jsonify({"message": "Rating added successfully", "rating_id": new_rating_id}), 201
 
 @app.route('/ratings', methods=['GET'])
@@ -341,22 +321,24 @@ def get_ratings():
     submitted_by_me = request.args.get('submitted_by')
     volunteer_id_filter = request.args.get('volunteer_id')
 
-    filtered_ratings = ratings
-
     if session['role'] == 'coordinator':
         if submitted_by_me == 'me':
-            filtered_ratings = [r for r in filtered_ratings if r.get('coordinator_id') == session['user_id']]
+            filtered_ratings = db_service.get_ratings(coordinator_id=session['user_id'])
         elif volunteer_id_filter:
             # Coordinator can only see ratings for volunteers they manage (simple check based on task assignment)
-            valid_task_ids_for_coord = [tid for tid, task in tasks.items() if task.get('assigned_to') == volunteer_id_filter]
-            filtered_ratings = [r for r in filtered_ratings if r.get('volunteer_id') == volunteer_id_filter and r.get('task_id') in valid_task_ids_for_coord]
+            volunteer_tasks = db_service.get_tasks_by_assignee(volunteer_id_filter)
+            valid_task_ids_for_coord = [task['task_id'] for task in volunteer_tasks]
+            all_ratings = db_service.get_ratings(volunteer_id=volunteer_id_filter)
+            filtered_ratings = [r for r in all_ratings if r.get('task_id') in valid_task_ids_for_coord]
         else:
             # Coordinators can only see ratings they submitted or for volunteers they oversee
             # For simplicity, let's say they can see all ratings, but cannot edit/delete others.
-            pass # More granular control would be needed here for a complex system
+            filtered_ratings = db_service.get_ratings()
     elif session['role'] == 'admin':
         if volunteer_id_filter:
-            filtered_ratings = [r for r in filtered_ratings if r.get('volunteer_id') == volunteer_id_filter]
+            filtered_ratings = db_service.get_ratings(volunteer_id=volunteer_id_filter)
+        else:
+            filtered_ratings = db_service.get_ratings()
 
     return jsonify(filtered_ratings), 200
 
@@ -364,7 +346,7 @@ def get_ratings():
 @role_required(['coordinator', 'admin'])
 def update_rating(rating_id):
     current_user_id = session['user_id']
-    rating = next((r for r in ratings if r.get('rating_id') == rating_id), None)
+    rating = db_service.get_rating(rating_id)
 
     if not rating:
         return jsonify({"message": "Rating not found"}), 404
@@ -373,13 +355,16 @@ def update_rating(rating_id):
         return jsonify({"message": "Forbidden: Cannot edit ratings not submitted by you"}), 403
 
     data = request.get_json()
+    update_data = {}
     if 'score' in data:
         if not isinstance(data['score'], (int, float)) or not (1 <= data['score'] <= 5):
             return jsonify({"message": "Score must be between 1 and 5"}), 400
-        rating['score'] = data['score']
+        update_data['score'] = data['score']
     if 'comments' in data:
-        rating['comments'] = data['comments']
+        update_data['comments'] = data['comments']
 
+    db_service.update_rating(rating_id, update_data)
+    rating.update(update_data)
     return jsonify({"message": "Rating updated successfully", "rating": rating}), 200
 
 @app.route('/expenses', methods=['GET'])
@@ -388,12 +373,7 @@ def get_expenses():
     task_id = request.args.get('task_id')
     category = request.args.get('category')
 
-    filtered_expenses = expenses
-    if task_id:
-        filtered_expenses = [exp for exp in filtered_expenses if exp.get('task_id') == task_id]
-    if category:
-        filtered_expenses = [exp for exp in filtered_expenses if exp.get('category') == category]
-
+    filtered_expenses = db_service.get_expenses(task_id=task_id, category=category)
     return jsonify(filtered_expenses), 200
 
 @app.route('/reports/attendance', methods=['GET'])
@@ -414,12 +394,16 @@ def report_attendance():
 def report_assignments():
     # [cite_start]Coordinator: Task assignment history [cite: 8]
     # [cite_start]Admin: Assignment logs per user [cite: 8]
+    all_tasks = db_service.get_all_tasks()
+    all_users = db_service.get_all_users()
+    users_dict = {u['user_id']: u for u in all_users}
+    
     assigned_tasks_data = []
-    for task_id, task in tasks.items():
+    for task in all_tasks:
         if task.get('assigned_to'):
-            assignee = users.get(task['assigned_to'])
+            assignee = users_dict.get(task['assigned_to'])
             assigned_tasks_data.append({
-                "task_id": task_id,
+                "task_id": task['task_id'],
                 "title": task['title'],
                 "assigned_to_id": task['assigned_to'],
                 "assigned_to_name": assignee['name'] if assignee else 'Unknown',
@@ -442,10 +426,10 @@ def report_expenses():
 @app.route('/users', methods=['GET'])
 @role_required(['admin'])
 def get_all_users():
-    users_list = []
-    for user_id, user_data in users.items():
-        user_info = {k: v for k, v in user_data.items() if k not in ['password']}
-        users_list.append(user_info)
+    users_list = db_service.get_all_users()
+    # Remove passwords from response
+    for user in users_list:
+        user.pop('password', None)
     return jsonify(users_list), 200
 
 @app.route('/users/create', methods=['POST'])
@@ -465,49 +449,53 @@ def create_user():
         return jsonify({"message": "Invalid role"}), 400
 
     # Check if email already exists
-    if any(u['email'] == email for u_id, u in users.items()):
+    existing_user = db_service.get_user_by_email(email)
+    if existing_user:
         return jsonify({"message": "User with this email already exists"}), 409
 
-    new_user_id = f"{role[0]}{uuid.uuid4().hex[:8]}"
-    users[new_user_id] = {
+    user_data = {
         "email": email,
         "password": password, # In a real app, hash and salt this!
         "role": role,
-        "user_id": new_user_id,
         "name": name,
         "contact": contact
     }
+    new_user_id = db_service.create_user(user_data)
     return jsonify({"message": "User created successfully", "user_id": new_user_id}), 201
 
 @app.route('/users/<user_id>', methods=['PUT'])
 @role_required(['admin'])
 def update_user(user_id):
-    user = users.get(user_id)
+    user = db_service.get_user(user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
 
     data = request.get_json()
+    update_data = {}
     if 'name' in data:
-        user['name'] = data['name']
+        update_data['name'] = data['name']
     if 'email' in data:
-        user['email'] = data['email']
+        update_data['email'] = data['email']
     if 'role' in data:
         if data['role'] in ['volunteer', 'coordinator', 'admin']:
-            user['role'] = data['role']
+            update_data['role'] = data['role']
         else:
             return jsonify({"message": "Invalid role"}), 400
     if 'password' in data:
-        user['password'] = data['password'] # Again, hash and salt this!
+        update_data['password'] = data['password'] # Again, hash and salt this!
     if 'contact' in data:
-        user['contact'] = data['contact']
+        update_data['contact'] = data['contact']
 
+    db_service.update_user(user_id, update_data)
+    user.update(update_data)
     return jsonify({"message": "User updated successfully", "user": {k: v for k, v in user.items() if k not in ['password']}}), 200
 
 @app.route('/users/<user_id>', methods=['DELETE'])
 @role_required(['admin'])
 def delete_user(user_id):
-    if user_id in users:
-        del users[user_id]
+    user = db_service.get_user(user_id)
+    if user:
+        db_service.delete_user(user_id)
         # In a real app, you'd also delete associated data (tasks, attendance, ratings, etc.)
         return jsonify({"message": "User deleted successfully"}), 200
     return jsonify({"message": "User not found"}), 404
@@ -525,15 +513,21 @@ def create_task():
     if not all([title, description, deadline, priority]):
         return jsonify({"message": "Missing required task fields"}), 400
 
-    new_task_id = f"t{uuid.uuid4().hex[:8]}"
-    tasks[new_task_id] = {
+    # Validate assigned_to if provided
+    if assigned_to:
+        user = db_service.get_user(assigned_to)
+        if not user or user['role'] not in ['volunteer', 'coordinator']:
+            assigned_to = None
+
+    task_data = {
         "title": title,
         "description": description,
         "deadline": deadline,
         "priority": priority,
         "status": "Pending",
-        "assigned_to": assigned_to if assigned_to in users and users[assigned_to]['role'] in ['volunteer', 'coordinator'] else None
+        "assigned_to": assigned_to
     }
+    new_task_id = db_service.create_task(task_data)
     return jsonify({"message": "Task created successfully", "task_id": new_task_id}), 201
 
 @app.route('/tasks/assign', methods=['POST'])
@@ -544,14 +538,15 @@ def admin_assign_task():
     task_id = data.get('task_id')
     assignee_id = data.get('assignee_id')
 
-    task = tasks.get(task_id)
-    assignee = users.get(assignee_id)
+    task = db_service.get_task(task_id)
+    assignee = db_service.get_user(assignee_id)
 
     if not task or not assignee:
         return jsonify({"message": "Invalid Task or Assignee ID"}), 404
     if assignee['role'] not in ['volunteer', 'coordinator']:
         return jsonify({"message": "Cannot assign tasks to this role"}), 400
 
+    db_service.update_task(task_id, {'assigned_to': assignee_id})
     task['assigned_to'] = assignee_id
     return jsonify({"message": "Task assigned successfully by admin", "task": task}), 200
 
@@ -559,53 +554,58 @@ def admin_assign_task():
 @role_required(['coordinator', 'admin'])  # Add 'admin' if you want admins to see all tasks
 def get_all_tasks():
     status_filter = request.args.get('status')
-    all_tasks = []
-    for task_id, task in tasks.items():
-        task_info = {"task_id": task_id, **task}
-        all_tasks.append(task_info)
     if status_filter:
-        all_tasks = [task for task in all_tasks if task.get('status', '').lower() == status_filter.lower()]
+        all_tasks = db_service.get_tasks_by_status(status_filter)
+    else:
+        all_tasks = db_service.get_all_tasks()
     return jsonify(all_tasks), 200
 
 @app.route('/tasks/<task_id>', methods=['PUT'])
 @role_required(['admin'])
 def admin_update_task(task_id):
-    task = tasks.get(task_id)
+    task = db_service.get_task(task_id)
     if not task:
         return jsonify({"message": "Task not found"}), 404
 
     data = request.get_json()
-    task.update(data) # Admin can update any field directly
+    db_service.update_task(task_id, data) # Admin can update any field directly
+    task.update(data)
     return jsonify({"message": "Task updated successfully", "task": task}), 200
 
 @app.route('/tasks/<task_id>', methods=['DELETE'])
 @role_required(['admin'])
 def delete_task(task_id):
-    if task_id in tasks:
-        del tasks[task_id]
+    task = db_service.get_task(task_id)
+    if task:
+        db_service.delete_task(task_id)
         return jsonify({"message": "Task deleted successfully"}), 200
     return jsonify({"message": "Task not found"}), 404
 
 # --- Absentees tracking ---
-absentees_logs = []  # Each entry: {log_id, user_id, task_id, date}
 
 @app.route('/attendance/absentees', methods=['GET'])
 @role_required(['admin'])
 def get_absentees():
     today_date = datetime.now().strftime("%Y-%m-%d")
     # Get all users who are volunteers or coordinators and have an assigned task
-    all_users = {uid for uid, u in users.items() if u['role'] in ['volunteer', 'coordinator']}
-    assigned_users = {task['assigned_to'] for task in tasks.values() if task.get('assigned_to')}
-    relevant_users = all_users & assigned_users
+    all_users = db_service.get_users_by_role('volunteer') + db_service.get_users_by_role('coordinator')
+    all_tasks = db_service.get_all_tasks()
+    assigned_users = {task['assigned_to'] for task in all_tasks if task.get('assigned_to')}
+    relevant_users = [u for u in all_users if u['user_id'] in assigned_users]
+    
     # Who logged attendance today?
-    users_who_logged_today = {log['user_id'] for log in attendance_logs if log['date'] == today_date}
+    attendance_today = db_service.get_attendance_logs(date=today_date)
+    users_who_logged_today = {log['user_id'] for log in attendance_today}
+    
     # Who is marked absent today?
-    users_marked_absent_today = {log['user_id'] for log in absentees_logs if log['date'] == today_date}
+    absentees_today = db_service.get_absentee_logs(date=today_date)
+    users_marked_absent_today = {log['user_id'] for log in absentees_today}
+    
     # Absentees: assigned users who neither logged attendance nor were marked absent
     absentees = []
-    for uid in relevant_users:
+    for user in relevant_users:
+        uid = user['user_id']
         if uid not in users_who_logged_today and uid not in users_marked_absent_today:
-            user = users[uid]
             absentees.append({
                 "user_id": uid,
                 "name": user['name'],
@@ -623,24 +623,24 @@ def mark_user_absent():
     date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
     if not user_id or not task_id:
         return jsonify({"message": "User ID and Task ID are required."}), 400
-    if user_id not in users:
+    user = db_service.get_user(user_id)
+    if not user:
         return jsonify({"message": "Invalid User ID."}), 400
-    if not tasks.get(task_id):
+    task = db_service.get_task(task_id)
+    if not task:
         return jsonify({"message": "Invalid Task ID."}), 400
     # Prevent duplicate absent marking for same user, task, date
-    if any(log for log in absentees_logs if log['user_id'] == user_id and log['task_id'] == task_id and log['date'] == date):
+    if db_service.check_absentee_exists(user_id, task_id, date):
         return jsonify({"message": "User already marked absent for this task and date."}), 409
-    new_log_id = f"abs{uuid.uuid4().hex[:8]}"
-    absentees_logs.append({"log_id": new_log_id, "user_id": user_id, "task_id": task_id, "date": date})
+    new_log_id = db_service.create_absentee_log({"log_id": f"abs{uuid.uuid4().hex[:8]}", "user_id": user_id, "task_id": task_id, "date": date})
     return jsonify({"message": "User marked absent successfully", "log_id": new_log_id}), 201
 
 @app.route('/ratings/<rating_id>', methods=['DELETE'])
 @role_required(['admin'])
 def delete_rating(rating_id):
-    global ratings # Declare global to modify the list
-    initial_len = len(ratings)
-    ratings = [r for r in ratings if r.get('rating_id') != rating_id]
-    if len(ratings) < initial_len:
+    rating = db_service.get_rating(rating_id)
+    if rating:
+        db_service.delete_rating(rating_id)
         return jsonify({"message": "Rating deleted successfully"}), 200
     return jsonify({"message": "Rating not found"}), 404
 
@@ -654,44 +654,47 @@ def log_expense():
 
     if not all([task_id, amount, category]):
         return jsonify({"message": "Missing required expense fields"}), 400
-    if not tasks.get(task_id):
+    task = db_service.get_task(task_id)
+    if not task:
         return jsonify({"message": "Invalid Task ID"}), 400
 
-    new_expense_id = f"e{uuid.uuid4().hex[:8]}"
-    expenses.append({
-        "expense_id": new_expense_id,
+    expense_data = {
+        "expense_id": f"e{uuid.uuid4().hex[:8]}",
         "task_id": task_id,
         "amount": amount,
         "category": category,
         "logged_by": session['user_id']
-    })
+    }
+    new_expense_id = db_service.create_expense(expense_data)
     return jsonify({"message": "Expense logged successfully", "expense_id": new_expense_id}), 201
 
 @app.route('/expenses/<expense_id>', methods=['PUT'])
 @role_required(['admin', 'coordinator'])  # Add 'coordinator' here
 def update_expense(expense_id):
     # Optionally, add logic to restrict which expenses a coordinator can edit
-    expense = next((e for e in expenses if e.get('expense_id') == expense_id), None)
+    expense = db_service.get_expense(expense_id)
     if not expense:
         return jsonify({"message": "Expense not found"}), 404
 
     data = request.get_json()
+    update_data = {}
     if 'amount' in data:
-        expense['amount'] = data['amount']
+        update_data['amount'] = data['amount']
     if 'category' in data:
-        expense['category'] = data['category']
+        update_data['category'] = data['category']
     if 'task_id' in data:
-        expense['task_id'] = data['task_id']
+        update_data['task_id'] = data['task_id']
 
+    db_service.update_expense(expense_id, update_data)
+    expense.update(update_data)
     return jsonify({"message": "Expense updated successfully", "expense": expense}), 200
 
 @app.route('/expenses/<expense_id>', methods=['DELETE'])
 @role_required(['admin'])
 def delete_expense(expense_id):
-    global expenses
-    initial_len = len(expenses)
-    expenses = [e for e in expenses if e.get('expense_id') != expense_id]
-    if len(expenses) < initial_len:
+    expense = db_service.get_expense(expense_id)
+    if expense:
+        db_service.delete_expense(expense_id)
         return jsonify({"message": "Expense deleted successfully"}), 200
     return jsonify({"message": "Expense not found"}), 404
 
@@ -701,12 +704,13 @@ def delete_expense(expense_id):
 @role_required(['admin'])
 def admin_report_tasks():
     # [cite_start]Task summary (assigned, completed, overdue) [cite: 8]
+    all_tasks = db_service.get_all_tasks()
     summary = {
-        "total_tasks": len(tasks),
-        "pending": sum(1 for t in tasks.values() if t['status'] == 'Pending'),
-        "in_progress": sum(1 for t in tasks.values() if t['status'] == 'In Progress'),
-        "completed": sum(1 for t in tasks.values() if t['status'] == 'Completed'),
-        "overdue": sum(1 for t in tasks.values() if t['status'] != 'Completed' and datetime.now().date() > datetime.strptime(t['deadline'], "%Y-%m-%d").date())
+        "total_tasks": len(all_tasks),
+        "pending": sum(1 for t in all_tasks if t['status'] == 'Pending'),
+        "in_progress": sum(1 for t in all_tasks if t['status'] == 'In Progress'),
+        "completed": sum(1 for t in all_tasks if t['status'] == 'Completed'),
+        "overdue": sum(1 for t in all_tasks if t['status'] != 'Completed' and datetime.now().date() > datetime.strptime(t['deadline'], "%Y-%m-%d").date())
     }
     return jsonify(summary), 200
 
@@ -714,8 +718,12 @@ def admin_report_tasks():
 @role_required(['admin'])
 def admin_report_ratings():
     # [cite_start]Ratings and feedback summary [cite: 8]
+    all_ratings = db_service.get_ratings()
+    all_users = db_service.get_all_users()
+    users_dict = {u['user_id']: u for u in all_users}
+    
     rating_summary = {}
-    for r in ratings:
+    for r in all_ratings:
         vol_id = r['volunteer_id']
         if vol_id not in rating_summary:
             rating_summary[vol_id] = {"total_score": 0, "count": 0, "comments": []}
@@ -725,7 +733,7 @@ def admin_report_ratings():
 
     for vol_id, data in rating_summary.items():
         data['average_score'] = data['total_score'] / data['count']
-        data['volunteer_name'] = users.get(vol_id, {}).get('name', 'Unknown')
+        data['volunteer_name'] = users_dict.get(vol_id, {}).get('name', 'Unknown')
 
     return jsonify(rating_summary), 200
 
@@ -741,41 +749,38 @@ def register_volunteer():
         return jsonify({"message": "Missing required fields"}), 400
 
     # Check if email already exists
-    if any(u['email'] == email for u in users.values()):
+    existing_user = db_service.get_user_by_email(email)
+    if existing_user:
         return jsonify({"message": "User with this email already exists"}), 409
 
-    new_user_id = f"v{uuid.uuid4().hex[:8]}"
-    users[new_user_id] = {
+    user_data = {
         "email": email,
         "password": password,  # In a real app, hash and salt this!
         "role": "volunteer",
-        "user_id": new_user_id,
         "name": name,
         "contact": contact
     }
+    new_user_id = db_service.create_user(user_data)
     return jsonify({"message": "Volunteer registered successfully", "user_id": new_user_id}), 201
 
 @app.route('/dashboard/volunteer', methods=['GET'])
 @role_required(['volunteer'])
 def volunteer_dashboard_summary():
     current_user_id = session['user_id']
-    user = users.get(current_user_id)
+    user = db_service.get_user(current_user_id)
     # Attendance %
-    total_tasks = len([t for t in tasks.values() if t.get('assigned_to') == current_user_id])
-    attended = len([log for log in attendance_logs if log.get('user_id') == current_user_id])
+    my_tasks = db_service.get_tasks_by_assignee(current_user_id)
+    total_tasks = len(my_tasks)
+    attendance_logs = db_service.get_attendance_logs(user_id=current_user_id)
+    attended = len(attendance_logs)
     attendance_percent = int((attended / total_tasks) * 100) if total_tasks else 0
     # Average rating
-    my_ratings = [r for r in ratings if r.get('volunteer_id') == current_user_id]
+    my_ratings = db_service.get_ratings(volunteer_id=current_user_id)
     avg_rating = round(sum(r['score'] for r in my_ratings) / len(my_ratings), 2) if my_ratings else 0
-    # Tasks
-    my_tasks = []
-    for task_id, t in tasks.items():
-        if t.get('assigned_to') == current_user_id:
-            task_info = {"task_id": task_id, **t}
-            # Attach rating if exists
-            task_ratings = [r for r in my_ratings if r['task_id'] == task_id]
-            task_info['rating'] = task_ratings[0]['score'] if task_ratings else None
-            my_tasks.append(task_info)
+    # Tasks with ratings
+    for task in my_tasks:
+        task_ratings = [r for r in my_ratings if r['task_id'] == task['task_id']]
+        task['rating'] = task_ratings[0]['score'] if task_ratings else None
     # Team (other volunteers, fake for now)
     team = [
         {"name": "Jane Cooper", "email": "jgraham@example.com", "location": "Toledo", "amount": 10483},
@@ -794,31 +799,34 @@ def volunteer_dashboard_summary():
 @role_required(['coordinator'])
 def coordinator_dashboard_summary():
     current_user_id = session['user_id']
-    user = users.get(current_user_id)
+    user = db_service.get_user(current_user_id)
     # Volunteers managed (all volunteers for now)
-    volunteer_ids = [uid for uid, u in users.items() if u['role'] == 'volunteer']
+    volunteers = db_service.get_users_by_role('volunteer')
+    volunteer_ids = [v['user_id'] for v in volunteers]
     # Attendance % (average of their volunteers)
     attendance_percents = []
-    for vid in volunteer_ids:
-        total_tasks = len([t for t in tasks.values() if t.get('assigned_to') == vid])
-        attended = len([log for log in attendance_logs if log.get('user_id') == vid])
+    for volunteer in volunteers:
+        vid = volunteer['user_id']
+        total_tasks = len(db_service.get_tasks_by_assignee(vid))
+        attended = len(db_service.get_attendance_logs(user_id=vid))
         percent = int((attended / total_tasks) * 100) if total_tasks else 0
         attendance_percents.append(percent)
     avg_attendance = int(sum(attendance_percents) / len(attendance_percents)) if attendance_percents else 0
     # Average rating (of their volunteers)
-    volunteer_ratings = [r for r in ratings if r.get('volunteer_id') in volunteer_ids]
+    volunteer_ratings = db_service.get_ratings()
+    volunteer_ratings = [r for r in volunteer_ratings if r.get('volunteer_id') in volunteer_ids]
     avg_rating = round(sum(r['score'] for r in volunteer_ratings) / len(volunteer_ratings), 2) if volunteer_ratings else 0
     # Tasks assigned
     assigned_tasks = []
-    for task_id, t in tasks.items():
-        if t.get('assigned_to') in volunteer_ids:
-            task_info = {"task_id": task_id, **t}
+    all_tasks = db_service.get_all_tasks()
+    for task in all_tasks:
+        if task.get('assigned_to') in volunteer_ids:
             # Attach rating if exists
-            task_ratings = [r for r in ratings if r['volunteer_id'] == t['assigned_to'] and r['task_id'] == task_id]
-            task_info['rating'] = task_ratings[0]['score'] if task_ratings else None
-            assigned_tasks.append(task_info)
+            task_ratings = [r for r in volunteer_ratings if r['volunteer_id'] == task['assigned_to'] and r['task_id'] == task['task_id']]
+            task['rating'] = task_ratings[0]['score'] if task_ratings else None
+            assigned_tasks.append(task)
     # Team (volunteers)
-    team = [{"name": users[vid]['name'], "email": users[vid]['email'], "location": "", "amount": 0} for vid in volunteer_ids]
+    team = [{"name": v['name'], "email": v['email'], "location": "", "amount": 0} for v in volunteers]
     return jsonify({
         "name": user['name'],
         "attendance_percent": avg_attendance,
@@ -830,29 +838,31 @@ def coordinator_dashboard_summary():
 @app.route('/dashboard/admin', methods=['GET'])
 @role_required(['admin'])
 def admin_dashboard_summary():
-    user = users.get(session['user_id'])
+    user = db_service.get_user(session['user_id'])
     # Attendance % (average of all volunteers)
-    volunteer_ids = [uid for uid, u in users.items() if u['role'] == 'volunteer']
+    volunteers = db_service.get_users_by_role('volunteer')
+    volunteer_ids = [v['user_id'] for v in volunteers]
     attendance_percents = []
-    for vid in volunteer_ids:
-        total_tasks = len([t for t in tasks.values() if t.get('assigned_to') == vid])
-        attended = len([log for log in attendance_logs if log.get('user_id') == vid])
+    for volunteer in volunteers:
+        vid = volunteer['user_id']
+        total_tasks = len(db_service.get_tasks_by_assignee(vid))
+        attended = len(db_service.get_attendance_logs(user_id=vid))
         percent = int((attended / total_tasks) * 100) if total_tasks else 0
         attendance_percents.append(percent)
     avg_attendance = int(sum(attendance_percents) / len(attendance_percents)) if attendance_percents else 0
     # Average rating (all volunteers)
-    volunteer_ratings = [r for r in ratings if r.get('volunteer_id') in volunteer_ids]
+    volunteer_ratings = db_service.get_ratings()
+    volunteer_ratings = [r for r in volunteer_ratings if r.get('volunteer_id') in volunteer_ids]
     avg_rating = round(sum(r['score'] for r in volunteer_ratings) / len(volunteer_ratings), 2) if volunteer_ratings else 0
     # All tasks
-    all_tasks = []
-    for task_id, t in tasks.items():
-        task_info = {"task_id": task_id, **t}
+    all_tasks = db_service.get_all_tasks()
+    for task in all_tasks:
         # Attach rating if exists
-        task_ratings = [r for r in ratings if r['volunteer_id'] == t.get('assigned_to') and r['task_id'] == task_id]
-        task_info['rating'] = task_ratings[0]['score'] if task_ratings else None
-        all_tasks.append(task_info)
+        task_ratings = [r for r in volunteer_ratings if r['volunteer_id'] == task.get('assigned_to') and r['task_id'] == task['task_id']]
+        task['rating'] = task_ratings[0]['score'] if task_ratings else None
     # Team (all users)
-    team = [{"name": u['name'], "email": u['email'], "location": "", "amount": 0} for uid, u in users.items()]
+    all_users = db_service.get_all_users()
+    team = [{"name": u['name'], "email": u['email'], "location": "", "amount": 0} for u in all_users]
     return jsonify({
         "name": user['name'],
         "attendance_percent": avg_attendance,
@@ -871,17 +881,18 @@ def mark_attendance_for_user():
 
     if not user_id or not task_id:
         return jsonify({"message": "User ID and Task ID are required."}), 400
-    if user_id not in users:
+    user = db_service.get_user(user_id)
+    if not user:
         return jsonify({"message": "Invalid User ID."}), 400
-    if not tasks.get(task_id):
+    task = db_service.get_task(task_id)
+    if not task:
         return jsonify({"message": "Invalid Task ID."}), 400
 
     # Prevent duplicate attendance for same user, task, date
-    if any(log for log in attendance_logs if log['user_id'] == user_id and log['task_id'] == task_id and log['date'] == date):
+    if db_service.check_attendance_exists(user_id, task_id, date):
         return jsonify({"message": "Attendance already submitted for this user, task, and date."}), 409
 
-    new_log_id = f"att{uuid.uuid4().hex[:8]}"
-    attendance_logs.append({"log_id": new_log_id, "user_id": user_id, "task_id": task_id, "date": date})
+    new_log_id = db_service.create_attendance_log({"log_id": f"att{uuid.uuid4().hex[:8]}", "user_id": user_id, "task_id": task_id, "date": date})
     return jsonify({"message": "Attendance marked successfully", "log_id": new_log_id}), 201
 
 # --- FILTER ENDPOINTS FOR UI ---
@@ -892,13 +903,7 @@ def filter_attendance():
     user_id = request.args.get('user_id')
     task_id = request.args.get('task_id')
     date = request.args.get('date')
-    filtered = attendance_logs
-    if user_id:
-        filtered = [a for a in filtered if a['user_id'] == user_id]
-    if task_id:
-        filtered = [a for a in filtered if a['task_id'] == task_id]
-    if date:
-        filtered = [a for a in filtered if a['date'] == date]
+    filtered = db_service.get_attendance_logs(user_id=user_id, task_id=task_id, date=date)
     return jsonify(filtered), 200
 
 @app.route('/expenses/filter', methods=['GET'])
@@ -907,13 +912,8 @@ def filter_expenses():
     task_id = request.args.get('task_id')
     category = request.args.get('category')
     date = request.args.get('date')
-    filtered = expenses
-    if task_id:
-        filtered = [e for e in filtered if e['task_id'] == task_id]
-    if category:
-        filtered = [e for e in filtered if e['category'] == category]
-    if date:
-        filtered = [e for e in filtered if e.get('date') == date]
+    filtered = db_service.get_expenses(task_id=task_id, category=category)
+    # Note: date filtering would need to be added to the database service if needed
     return jsonify(filtered), 200
 
 @app.route('/ratings/filter', methods=['GET'])
@@ -923,11 +923,7 @@ def filter_ratings():
     task_id = request.args.get('task_id')
     score = request.args.get('score')
     comments = request.args.get('comments')
-    filtered = ratings
-    if volunteer_id:
-        filtered = [r for r in filtered if r['volunteer_id'] == volunteer_id]
-    if task_id:
-        filtered = [r for r in filtered if r['task_id'] == task_id]
+    filtered = db_service.get_ratings(volunteer_id=volunteer_id, task_id=task_id)
     if score:
         try:
             score_val = int(score)
@@ -943,9 +939,10 @@ def filter_ratings():
 def filter_users():
     role = request.args.get('role')
     name = request.args.get('name')
-    filtered = [u for u in users.values()]
     if role:
-        filtered = [u for u in filtered if u['role'] == role]
+        filtered = db_service.get_users_by_role(role)
+    else:
+        filtered = db_service.get_all_users()
     if name:
         filtered = [u for u in filtered if name.lower() in u['name'].lower()]
     # Remove password from output
@@ -959,29 +956,30 @@ def filter_tasks():
     status = request.args.get('status')
     priority = request.args.get('priority')
     assigned_to = request.args.get('assigned_to')
-    filtered = []
-    for task_id, t in tasks.items():
-        if status and t.get('status') != status:
-            continue
-        if priority and t.get('priority') != priority:
-            continue
-        if assigned_to and t.get('assigned_to') != assigned_to:
-            continue
-        filtered.append({'task_id': task_id, **t})
+    
+    if status:
+        filtered = db_service.get_tasks_by_status(status)
+    else:
+        filtered = db_service.get_all_tasks()
+    
+    if priority:
+        filtered = [t for t in filtered if t.get('priority') == priority]
+    if assigned_to:
+        filtered = [t for t in filtered if t.get('assigned_to') == assigned_to]
+    
     return jsonify(filtered), 200
 
 @app.route('/volunteers/filter', methods=['GET'])
 @role_required(['admin', 'coordinator'])
 def filter_volunteers():
     role = request.args.get('role')
+    volunteers = db_service.get_users_by_role('volunteer')
     filtered = []
-    for uid, u in users.items():
-        if u['role'] != 'volunteer':
-            continue
+    for u in volunteers:
         if role and u['role'] != role:
             continue
         filtered.append({
-            'user_id': uid,
+            'user_id': u['user_id'],
             'name': u['name'],
             'email': u['email'],
             'contact': u.get('contact', ''),
@@ -991,3 +989,6 @@ def filter_volunteers():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
+# For Vercel deployment
+app = app
