@@ -20,6 +20,7 @@ class FirebaseConfig:
             
             # For production (Vercel), use environment variables
             if os.getenv('FIREBASE_PROJECT_ID'):
+                print("Using environment variables for Firebase initialization")
                 cred_dict = {
                     "type": "service_account",
                     "project_id": os.getenv('FIREBASE_PROJECT_ID'),
@@ -32,13 +33,23 @@ class FirebaseConfig:
                     "auth_provider_x509_cert_url": os.getenv('FIREBASE_AUTH_PROVIDER_X509_CERT_URL'),
                     "client_x509_cert_url": os.getenv('FIREBASE_CLIENT_X509_CERT_URL')
                 }
+                print(f"Firebase project ID: {cred_dict['project_id']}")
+                print(f"Client email: {cred_dict['client_email']}")
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
             elif os.path.exists('serviceAccountKey.json'):
+                print("Using serviceAccountKey.json for Firebase initialization")
                 # Use service account key file for local development
-                cred = credentials.Certificate('serviceAccountKey.json')
-                firebase_admin.initialize_app(cred)
+                try:
+                    cred = credentials.Certificate('serviceAccountKey.json')
+                    firebase_admin.initialize_app(cred)
+                    print("Firebase initialized with serviceAccountKey.json")
+                except Exception as e:
+                    print(f"Error loading serviceAccountKey.json: {e}")
+                    # Try to use default credentials as fallback
+                    firebase_admin.initialize_app()
             else:
+                print("Using default credentials for Firebase initialization")
                 # Use default credentials (for development with Firebase emulator or GCP)
                 firebase_admin.initialize_app()
             
@@ -50,6 +61,7 @@ class FirebaseConfig:
             print(f"Error type: {type(e)}")
             import traceback
             traceback.print_exc()
+            print("Firebase initialization failed. App will run without Firebase features.")
             # Fallback to in-memory storage for development
             self.db = None
     
