@@ -5,6 +5,9 @@ import os
 from functools import wraps
 from datetime import datetime
 from database_service import db_service
+from firebase_auth_service import firebase_auth_service
+from firebase_config import firebase_config
+import jwt
 
 app = Flask(__name__)
 CORS(app)
@@ -20,9 +23,30 @@ app.config['SESSION_COOKIE_SECURE'] = False
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session:
-            return jsonify({"message": "Unauthorized: Login required"}), 401
-        return f(*args, **kwargs)
+        # Check session-based auth first
+        if 'user_id' in session:
+            return f(*args, **kwargs)
+        
+        # Check token-based auth
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header.split(' ')[1]
+            try:
+                # Verify JWT token
+                decoded_token = jwt.decode(token, app.secret_key, algorithms=['HS256'])
+                user_id = decoded_token.get('user_id')
+                if user_id:
+                    # Set session for this request
+                    session['user_id'] = user_id
+                    session['role'] = decoded_token.get('role')
+                    session['provider'] = decoded_token.get('provider', 'email')
+                    return f(*args, **kwargs)
+            except jwt.ExpiredSignatureError:
+                return jsonify({"message": "Token expired"}), 401
+            except jwt.InvalidTokenError:
+                return jsonify({"message": "Invalid token"}), 401
+        
+        return jsonify({"message": "Unauthorized: Login required"}), 401
     return decorated_function
 
 def role_required(allowed_roles):
@@ -72,13 +96,40 @@ def login():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
+    return_token = data.get('return_token', False)  # Option to return JWT token
 
     user = db_service.get_user_by_email(email)
     
     if user and user.get('password') == password:
         session['user_id'] = user['user_id']
         session['role'] = user['role']
-        return jsonify({"message": "Login successful", "role": user['role'], "redirect_to": "/dashbords"}), 200
+        session['provider'] = user.get('provider', 'email')
+        
+        response_data = {
+            "message": "Login successful", 
+            "role": user['role'], 
+            "redirect_to": "/dashbords",
+            "user": {
+                "user_id": user['user_id'],
+                "name": user['name'],
+                "email": user['email'],
+                "role": user['role'],
+                "profile_picture": user.get('profile_picture', '')
+            }
+        }
+        
+        if return_token:
+            # Generate JWT token
+            token_payload = {
+                'user_id': user['user_id'],
+                'role': user['role'],
+                'provider': user.get('provider', 'email'),
+                'exp': datetime.utcnow().timestamp() + 3600  # 1 hour expiry
+            }
+            token = jwt.encode(token_payload, app.secret_key, algorithm='HS256')
+            response_data['token'] = token
+        
+        return jsonify(response_data), 200
     return jsonify({"message": "Invalid credentials"}), 401
 
 @app.route('/logout', methods=['POST'])
@@ -86,13 +137,231 @@ def login():
 def logout():
     session.pop('user_id', None)
     session.pop('role', None)
+    session.pop('provider', None)
     return jsonify({'message': 'Logout successful'}), 200
 
 @app.route('/session/check', methods=['GET'])
 def check_session():
     if 'role' in session:
-        return jsonify({'logged_in': True, 'role': session['role']}), 200
+        return jsonify({
+            'logged_in': True, 
+            'role': session['role'],
+            'provider': session.get('provider', 'email'),
+            'user_id': session.get('user_id')
+        }), 200
     return jsonify({'logged_in': False}), 200
+
+@app.route('/auth/refresh', methods=['POST'])
+@login_required
+def refresh_token():
+    """Refresh JWT token"""
+    current_user_id = session['user_id']
+    user = db_service.get_user(current_user_id)
+    
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    
+    # Generate new JWT token
+    token_payload = {
+        'user_id': current_user_id,
+        'role': session['role'],
+        'provider': session.get('provider', 'email'),
+        'exp': datetime.utcnow().timestamp() + 3600  # 1 hour expiry
+    }
+    token = jwt.encode(token_payload, app.secret_key, algorithm='HS256')
+    
+    return jsonify({
+        "message": "Token refreshed successfully",
+        "token": token,
+        "expires_in": 3600
+    }), 200
+
+# --- Google Authentication Endpoints ---
+
+@app.route('/auth/google', methods=['POST'])
+def google_auth():
+    """Authenticate user with Google ID token"""
+    try:
+        data = request.get_json()
+        print(f"Google auth request data: {data}")
+        
+        id_token = data.get('id_token')
+        
+        if not id_token:
+            print("No ID token provided")
+            return jsonify({"message": "Google ID token is required"}), 400
+        
+        print(f"Verifying Google token: {id_token[:50]}...")
+        
+        # Verify Google token
+        user_info = firebase_auth_service.verify_google_token(id_token)
+        print(f"User info from token: {user_info}")
+        
+        if not user_info:
+            print("Token verification failed")
+            return jsonify({"message": "Invalid Google token"}), 401
+        
+        email = user_info.get('email')
+        if not email:
+            print("No email found in token")
+            return jsonify({"message": "Email not found in Google token"}), 400
+        
+        print(f"Looking up user with email: {email}")
+        
+        # Check if user exists in our database
+        user = db_service.get_user_by_email(email)
+        print(f"User found: {user}")
+        
+        if not user:
+            # Create new user with Google info
+            user_data = {
+                "email": email,
+                "name": user_info.get('name', ''),
+                "contact": "",
+                "role": "volunteer",  # Default role for Google sign-ups
+                "provider": "google",
+                "firebase_uid": user_info.get('uid'),
+                "profile_picture": user_info.get('picture', ''),
+                "email_verified": user_info.get('email_verified', False)
+            }
+            user_id = db_service.create_user(user_data)
+            user = db_service.get_user(user_id)
+        else:
+            # Update existing user with Google info if needed
+            update_data = {}
+            if not user.get('firebase_uid'):
+                update_data['firebase_uid'] = user_info.get('uid')
+            if not user.get('provider'):
+                update_data['provider'] = 'google'
+            if user_info.get('picture') and not user.get('profile_picture'):
+                update_data['profile_picture'] = user_info.get('picture')
+            
+            if update_data:
+                db_service.update_user(user['user_id'], update_data)
+                user.update(update_data)
+        
+        # Create session
+        session['user_id'] = user['user_id']
+        session['role'] = user['role']
+        session['provider'] = 'google'
+        
+        # Generate JWT token
+        token_payload = {
+            'user_id': user['user_id'],
+            'role': user['role'],
+            'provider': 'google',
+            'exp': datetime.utcnow().timestamp() + 3600  # 1 hour expiry
+        }
+        token = jwt.encode(token_payload, app.secret_key, algorithm='HS256')
+        
+        print("Google authentication successful")
+        return jsonify({
+            "message": "Google authentication successful",
+            "role": user['role'],
+            "redirect_to": "/dashbords",
+            "token": token,
+            "user": {
+                "user_id": user['user_id'],
+                "name": user['name'],
+                "email": user['email'],
+                "role": user['role'],
+                "profile_picture": user.get('profile_picture', '')
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"Error in Google auth: {e}")
+        return jsonify({"message": f"Authentication error: {str(e)}"}), 500
+
+@app.route('/auth/google/register', methods=['POST'])
+def google_register():
+    """Register new user with Google (with role selection)"""
+    try:
+        data = request.get_json()
+        print(f"Google register request data: {data}")
+        
+        id_token = data.get('id_token')
+        role = data.get('role', 'volunteer')  # Allow role selection
+        contact = data.get('contact', '')
+        
+        if not id_token:
+            print("No ID token provided for registration")
+            return jsonify({"message": "Google ID token is required"}), 400
+        
+        if role not in ['volunteer', 'coordinator']:
+            return jsonify({"message": "Invalid role. Must be 'volunteer' or 'coordinator'"}), 400
+        
+        print(f"Verifying Google token for registration: {id_token[:50]}...")
+        
+        # Verify Google token
+        user_info = firebase_auth_service.verify_google_token(id_token)
+        print(f"User info from token: {user_info}")
+        
+        if not user_info:
+            print("Token verification failed for registration")
+            return jsonify({"message": "Invalid Google token"}), 401
+        
+        email = user_info.get('email')
+        if not email:
+            print("No email found in token for registration")
+            return jsonify({"message": "Email not found in Google token"}), 400
+        
+        print(f"Looking up existing user with email: {email}")
+        
+        # Check if user already exists
+        existing_user = db_service.get_user_by_email(email)
+        if existing_user:
+            print("User already exists")
+            return jsonify({"message": "User with this email already exists"}), 409
+        
+        print("Creating new user")
+        # Create new user
+        user_data = {
+            "email": email,
+            "name": user_info.get('name', ''),
+            "contact": contact,
+            "role": role,
+            "provider": "google",
+            "firebase_uid": user_info.get('uid'),
+            "profile_picture": user_info.get('picture', ''),
+            "email_verified": user_info.get('email_verified', False)
+        }
+        
+        user_id = db_service.create_user(user_data)
+        user = db_service.get_user(user_id)
+        
+        # Create session
+        session['user_id'] = user['user_id']
+        session['role'] = user['role']
+        session['provider'] = 'google'
+        
+        # Generate JWT token
+        token_payload = {
+            'user_id': user['user_id'],
+            'role': user['role'],
+            'provider': 'google',
+            'exp': datetime.utcnow().timestamp() + 3600  # 1 hour expiry
+        }
+        token = jwt.encode(token_payload, app.secret_key, algorithm='HS256')
+        
+        print("Google registration successful")
+        return jsonify({
+            "message": "Google registration successful",
+            "role": user['role'],
+            "redirect_to": "/dashbords",
+            "token": token,
+            "user": {
+                "user_id": user['user_id'],
+                "name": user['name'],
+                "email": user['email'],
+                "role": user['role'],
+                "profile_picture": user.get('profile_picture', '')
+            }
+        }), 201
+        
+    except Exception as e:
+        print(f"Error in Google registration: {e}")
+        return jsonify({"message": f"Registration error: {str(e)}"}), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -749,29 +1018,86 @@ def admin_report_ratings():
 
 @app.route('/register', methods=['POST'])
 def register_volunteer():
+    """Register user with email/password or Google Auth"""
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
     name = data.get('name')
     contact = data.get('contact')
+    role = data.get('role', 'volunteer')
+    id_token = data.get('id_token')  # For Google Auth
+    provider = data.get('provider', 'email')  # 'email' or 'google'
 
-    if not all([email, password, name]):
-        return jsonify({"message": "Missing required fields"}), 400
+    # Validate role
+    if role not in ['volunteer', 'coordinator']:
+        return jsonify({"message": "Invalid role. Must be 'volunteer' or 'coordinator'"}), 400
 
     # Check if email already exists
     existing_user = db_service.get_user_by_email(email)
     if existing_user:
         return jsonify({"message": "User with this email already exists"}), 409
 
-    user_data = {
-        "email": email,
-        "password": password,  # In a real app, hash and salt this!
-        "role": "volunteer",
-        "name": name,
-        "contact": contact
-    }
+    if provider == 'google' and id_token:
+        # Google Auth registration
+        user_info = firebase_auth_service.verify_google_token(id_token)
+        if not user_info:
+            return jsonify({"message": "Invalid Google token"}), 401
+        
+        user_data = {
+            "email": email,
+            "name": user_info.get('name', name),
+            "contact": contact,
+            "role": role,
+            "provider": "google",
+            "firebase_uid": user_info.get('uid'),
+            "profile_picture": user_info.get('picture', ''),
+            "email_verified": user_info.get('email_verified', False)
+        }
+    else:
+        # Email/password registration
+        if not all([email, password, name]):
+            return jsonify({"message": "Missing required fields for email registration"}), 400
+        
+        user_data = {
+            "email": email,
+            "password": password,  # In a real app, hash and salt this!
+            "role": role,
+            "name": name,
+            "contact": contact,
+            "provider": "email"
+        }
+
     new_user_id = db_service.create_user(user_data)
-    return jsonify({"message": "Volunteer registered successfully", "user_id": new_user_id}), 201
+    user = db_service.get_user(new_user_id)
+    
+    # Create session for immediate login
+    session['user_id'] = new_user_id
+    session['role'] = role
+    session['provider'] = provider
+    
+    # Generate JWT token
+    token_payload = {
+        'user_id': new_user_id,
+        'role': role,
+        'provider': provider,
+        'exp': datetime.utcnow().timestamp() + 3600  # 1 hour expiry
+    }
+    token = jwt.encode(token_payload, app.secret_key, algorithm='HS256')
+    
+    return jsonify({
+        "message": f"{role.capitalize()} registered successfully", 
+        "user_id": new_user_id,
+        "role": role,
+        "redirect_to": "/dashbords",
+        "token": token,
+        "user": {
+            "user_id": new_user_id,
+            "name": user['name'],
+            "email": user['email'],
+            "role": role,
+            "profile_picture": user.get('profile_picture', '')
+        }
+    }), 201
 
 @app.route('/dashboard/volunteer', methods=['GET'])
 @role_required(['volunteer'])
