@@ -18,8 +18,20 @@ class FirebaseConfig:
                 self.db = firestore.client()
                 return
             
+            # For local development, prioritize serviceAccountKey.json file
+            if os.path.exists('serviceAccountKey.json'):
+                print("Using serviceAccountKey.json for Firebase initialization")
+                # Use service account key file for local development
+                try:
+                    cred = credentials.Certificate('serviceAccountKey.json')
+                    firebase_admin.initialize_app(cred)
+                    print("Firebase initialized with serviceAccountKey.json")
+                except Exception as e:
+                    print(f"Error loading serviceAccountKey.json: {e}")
+                    # Try to use default credentials as fallback
+                    firebase_admin.initialize_app()
             # For production (Vercel), use environment variables
-            if os.getenv('FIREBASE_PROJECT_ID'):
+            elif os.getenv('FIREBASE_PROJECT_ID'):
                 print("Using environment variables for Firebase initialization")
                 cred_dict = {
                     "type": "service_account",
@@ -37,17 +49,6 @@ class FirebaseConfig:
                 print(f"Client email: {cred_dict['client_email']}")
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
-            elif os.path.exists('serviceAccountKey.json'):
-                print("Using serviceAccountKey.json for Firebase initialization")
-                # Use service account key file for local development
-                try:
-                    cred = credentials.Certificate('serviceAccountKey.json')
-                    firebase_admin.initialize_app(cred)
-                    print("Firebase initialized with serviceAccountKey.json")
-                except Exception as e:
-                    print(f"Error loading serviceAccountKey.json: {e}")
-                    # Try to use default credentials as fallback
-                    firebase_admin.initialize_app()
             else:
                 print("Using default credentials for Firebase initialization")
                 # Use default credentials (for development with Firebase emulator or GCP)
