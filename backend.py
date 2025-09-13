@@ -8,6 +8,7 @@ from database_service import db_service
 from firebase_auth_service import firebase_auth_service
 from firebase_config import firebase_config
 import jwt
+import firebase_admin
 
 app = Flask(__name__)
 CORS(app, origins=["*"], supports_credentials=True)
