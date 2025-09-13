@@ -15,10 +15,6 @@ app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your_super_secret_key') # Use en
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
 
-# --- Firebase Database Service ---
-# All data operations now go through the database service
-
-# --- Helper Functions and Decorators for Authentication and Authorization ---
 
 def login_required(f):
     @wraps(f)
@@ -372,8 +368,29 @@ def health_check():
     return jsonify({
         'status': 'healthy',
         'firebase_connected': db_service.db is not None,
-        'environment': 'production' if os.getenv('FIREBASE_PROJECT_ID') else 'development'
+        'environment': 'production' if os.getenv('FIREBASE_PROJECT_ID') else 'development',
+        'firebase_admin_initialized': len(firebase_admin._apps) > 0
     }), 200
+
+@app.route('/test-firebase', methods=['GET'])
+def test_firebase():
+    """Test Firebase Admin SDK initialization"""
+    try:
+        from firebase_admin import auth
+        # Try to list users (this will fail if not properly initialized)
+        users = auth.list_users(max_results=1)
+        return jsonify({
+            'firebase_admin_initialized': True,
+            'can_access_auth': True,
+            'message': 'Firebase Admin SDK is working'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'firebase_admin_initialized': len(firebase_admin._apps) > 0,
+            'can_access_auth': False,
+            'error': str(e),
+            'message': 'Firebase Admin SDK has issues'
+        }), 500
 
 # --- VOLUNTEER ROLE ENDPOINTS ---
 

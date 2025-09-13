@@ -47,6 +47,9 @@ class FirebaseConfig:
             
         except Exception as e:
             print(f"Error initializing Firebase: {e}")
+            print(f"Error type: {type(e)}")
+            import traceback
+            traceback.print_exc()
             # Fallback to in-memory storage for development
             self.db = None
     

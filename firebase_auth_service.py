@@ -28,8 +28,16 @@ class FirebaseAuthService:
     def verify_google_token(self, id_token: str) -> Optional[Dict[str, Any]]:
         """Verify Google ID token and return user info"""
         try:
+            print(f"Attempting to verify Google token: {id_token[:50]}...")
+            
+            # Check if Firebase Admin is initialized
+            if not firebase_admin._apps:
+                print("Firebase Admin not initialized!")
+                return None
+            
             # Use Firebase Admin SDK to verify the token
             decoded_token = auth.verify_id_token(id_token)
+            print(f"Token verified successfully: {decoded_token}")
             
             # Extract user information
             user_info = {
@@ -42,10 +50,14 @@ class FirebaseAuthService:
                 'firebase_claims': decoded_token
             }
             
+            print(f"Extracted user info: {user_info}")
             return user_info
             
         except Exception as e:
             print(f"Error verifying Google token: {e}")
+            print(f"Error type: {type(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def create_custom_token(self, uid: str, additional_claims: Optional[Dict] = None) -> str:

@@ -1273,6 +1273,8 @@
           console.log("Starting Google login...");
           console.log("Firebase config:", firebaseConfig);
           console.log("Google provider:", googleProvider);
+          console.log("Auth object:", auth);
+          console.log("Current user before login:", auth.currentUser);
 
           const result = await auth.signInWithPopup(googleProvider);
           console.log("Google popup result:", result);
