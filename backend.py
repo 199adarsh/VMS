@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, session, redirect, url_for, render_template
+from flask_cors import CORS
 import uuid
 import os
 from functools import wraps
@@ -6,6 +7,7 @@ from datetime import datetime
 from database_service import db_service
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your_super_secret_key') # Use environment variable in production
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
@@ -91,6 +93,14 @@ def check_session():
     if 'role' in session:
         return jsonify({'logged_in': True, 'role': session['role']}), 200
     return jsonify({'logged_in': False}), 200
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'firebase_connected': db_service.db is not None,
+        'environment': 'production' if os.getenv('FIREBASE_PROJECT_ID') else 'development'
+    }), 200
 
 # --- VOLUNTEER ROLE ENDPOINTS ---
 
