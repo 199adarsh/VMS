@@ -1185,27 +1185,27 @@ async function fetchCoordinatorReports() {
 
 if (createUserForm) {
   createUserForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const name = createUserNameInput.value;
-  const email = createUserEmailInput.value;
-  const password = createUserPasswordInput.value;
-  const role = createUserRoleSelect.value;
-  const contact = createUserContactInput.value;
+    e.preventDefault();
+    const name = createUserNameInput.value;
+    const email = createUserEmailInput.value;
+    const password = createUserPasswordInput.value;
+    const role = createUserRoleSelect.value;
+    const contact = createUserContactInput.value;
 
-  try {
-    const result = await apiRequest("/users/create", "POST", {
-      name,
-      email,
-      password,
-      role,
-      contact,
-    });
-    showMessage(createUserMessage, result.message, "success");
-    createUserForm.reset();
-    fetchAllUsers(); // Refresh user list
-  } catch (error) {
-    showMessage(createUserMessage, error.message, "error");
-  }
+    try {
+      const result = await apiRequest("/users/create", "POST", {
+        name,
+        email,
+        password,
+        role,
+        contact,
+      });
+      showMessage(createUserMessage, result.message, "success");
+      createUserForm.reset();
+      fetchAllUsers(); // Refresh user list
+    } catch (error) {
+      showMessage(createUserMessage, error.message, "error");
+    }
   });
 }
 

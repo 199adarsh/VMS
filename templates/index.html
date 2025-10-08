@@ -1339,8 +1339,8 @@
           const idToken = await result.user.getIdToken();
           console.log("Got ID token:", idToken ? "Yes" : "No");
 
-          const role = registerForm.role.value || "volunteer";
-          const contact = registerForm.contact.value || "";
+          const role = registerForm ? registerForm.role.value || "volunteer" : "volunteer";
+          const contact = registerForm ? registerForm.contact.value || "" : "";
 
           const response = await apiRequest("/auth/google/register", "POST", {
             id_token: idToken,
