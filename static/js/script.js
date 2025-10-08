@@ -1450,18 +1450,18 @@ async function populateAdminTaskAssignToSelect() {
           checkboxDiv.style.display = "flex";
           checkboxDiv.style.alignItems = "center";
           checkboxDiv.style.gap = "8px";
-          
+
           const checkbox = document.createElement("input");
           checkbox.type = "checkbox";
           checkbox.value = user.user_id;
           checkbox.id = `volunteer-${user.user_id}`;
-          
+
           const label = document.createElement("label");
           label.htmlFor = `volunteer-${user.user_id}`;
           label.textContent = `${user.name} (${user.role})`;
           label.style.fontSize = "14px";
           label.style.color = "#333";
-          
+
           checkboxDiv.appendChild(checkbox);
           checkboxDiv.appendChild(label);
           volunteerCheckboxes.appendChild(checkboxDiv);
@@ -1482,9 +1482,14 @@ if (createTaskForm) {
     const deadline = newTaskDeadlineInput.value;
     const priority = newTaskPrioritySelect.value;
     // Get selected volunteers from checkboxes
-  const volunteerCheckboxes = document.querySelectorAll('#volunteer-checkboxes input[type="checkbox"]:checked');
-  const assignedVolunteers = Array.from(volunteerCheckboxes).map(cb => cb.value);
-  const assignedTo = assignedVolunteers.length > 0 ? assignedVolunteers[0] : null; // Use first volunteer as primary assignee
+    const volunteerCheckboxes = document.querySelectorAll(
+      '#volunteer-checkboxes input[type="checkbox"]:checked'
+    );
+    const assignedVolunteers = Array.from(volunteerCheckboxes).map(
+      (cb) => cb.value
+    );
+    const assignedTo =
+      assignedVolunteers.length > 0 ? assignedVolunteers[0] : null; // Use first volunteer as primary assignee
 
     try {
       const result = await apiRequest("/tasks/create", "POST", {
@@ -2299,31 +2304,42 @@ function setupDashboardQuickActions() {
     function (id) {
       document.getElementById(id).classList.remove("hidden");
     };
-  document.getElementById("dashboard-add-task-btn").onclick = () =>
-    showTab("admin-tasks");
-  document.getElementById("dashboard-mark-attendance-btn").onclick = () =>
-    showTab("admin-attendance");
-  document.getElementById("dashboard-add-rating-btn").onclick = () =>
-    showTab("admin-ratings");
-  document.getElementById("dashboard-add-expense-btn").onclick = () =>
-    showTab("admin-expenses");
-  document.getElementById("dashboard-view-reports-btn").onclick = () =>
-    showTab("admin-reports");
-  document.getElementById("dashboard-view-volunteers-btn").onclick = () =>
-    showTab("admin-users");
+  const addTaskBtn = document.getElementById("dashboard-add-task-btn");
+  if (addTaskBtn) addTaskBtn.onclick = () => showTab("admin-tasks");
+  
+  const markAttendanceBtn = document.getElementById("dashboard-mark-attendance-btn");
+  if (markAttendanceBtn) markAttendanceBtn.onclick = () => showTab("admin-attendance");
+  const addRatingBtn = document.getElementById("dashboard-add-rating-btn");
+  if (addRatingBtn) addRatingBtn.onclick = () => showTab("admin-ratings");
+  
+  const addExpenseBtn = document.getElementById("dashboard-add-expense-btn");
+  if (addExpenseBtn) addExpenseBtn.onclick = () => showTab("admin-expenses");
+  
+  const viewReportsBtn = document.getElementById("dashboard-view-reports-btn");
+  if (viewReportsBtn) viewReportsBtn.onclick = () => showTab("admin-reports");
+  
+  const viewVolunteersBtn = document.getElementById("dashboard-view-volunteers-btn");
+  if (viewVolunteersBtn) viewVolunteersBtn.onclick = () => showTab("admin-users");
 }
 
 // Unified search (dashboard only)
-document
-  .getElementById("dashboard-search")
-  .addEventListener("input", function (e) {
+const dashboardSearch = document.getElementById("dashboard-search");
+if (dashboardSearch) {
+  dashboardSearch.addEventListener("input", function (e) {
     // Implement search/filter logic across dashboard widgets if needed
   });
+}
 
 // Theme toggle (dashboard only)
-document.getElementById("dashboard-theme-toggle").onclick = function () {
-  document.getElementById("dashboard-section").classList.toggle("dark");
-};
+const themeToggle = document.getElementById("dashboard-theme-toggle");
+if (themeToggle) {
+  themeToggle.onclick = function () {
+    const dashboardSection = document.getElementById("dashboard-section");
+    if (dashboardSection) {
+      dashboardSection.classList.toggle("dark");
+    }
+  };
+}
 
 // Auto-refresh every 30s
 setInterval(() => {
