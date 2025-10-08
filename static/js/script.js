@@ -95,20 +95,22 @@ if (googleLoginBtn) {
   googleLoginBtn.addEventListener("click", async () => {
     try {
       console.log("Starting Google login...");
-      const result = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      const result = await firebase
+        .auth()
+        .signInWithPopup(new firebase.auth.GoogleAuthProvider());
       const idToken = await result.user.getIdToken();
-      
+
       const response = await apiRequest("/auth/google", "POST", {
         id_token: idToken,
       });
-      
+
       if (response && response.redirect_to) {
         window.location.href = response.redirect_to;
       }
     } catch (error) {
       console.error("Google login error:", error);
       let errorMessage = "Google login failed. Please try again.";
-      
+
       if (error.code === "auth/popup-closed-by-user") {
         errorMessage = "Google login was cancelled. Please try again.";
       } else if (error.code === "auth/popup-blocked") {
@@ -116,7 +118,7 @@ if (googleLoginBtn) {
       } else if (error.code === "auth/unauthorized-domain") {
         errorMessage = "This domain is not authorized for Google sign-in.";
       }
-      
+
       if (loginMessage) {
         showMessage(loginMessage, errorMessage, "error");
       }
@@ -129,25 +131,29 @@ if (googleRegisterBtn) {
   googleRegisterBtn.addEventListener("click", async () => {
     try {
       console.log("Starting Google registration...");
-      const result = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      const result = await firebase
+        .auth()
+        .signInWithPopup(new firebase.auth.GoogleAuthProvider());
       const idToken = await result.user.getIdToken();
-      
-      const role = registerForm ? registerForm.role.value || "volunteer" : "volunteer";
+
+      const role = registerForm
+        ? registerForm.role.value || "volunteer"
+        : "volunteer";
       const contact = registerForm ? registerForm.contact.value || "" : "";
-      
+
       const response = await apiRequest("/auth/google/register", "POST", {
         id_token: idToken,
         role: role,
         contact: contact,
       });
-      
+
       if (response && response.redirect_to) {
         window.location.href = response.redirect_to;
       }
     } catch (error) {
       console.error("Google registration error:", error);
       let errorMessage = "Google registration failed. Please try again.";
-      
+
       if (error.code === "auth/popup-closed-by-user") {
         errorMessage = "Google registration was cancelled. Please try again.";
       } else if (error.code === "auth/popup-blocked") {
@@ -155,7 +161,7 @@ if (googleRegisterBtn) {
       } else if (error.code === "auth/unauthorized-domain") {
         errorMessage = "This domain is not authorized for Google sign-in.";
       }
-      
+
       if (registerMessage) {
         showMessage(registerMessage, errorMessage, "error");
       }
@@ -241,15 +247,14 @@ const createUserRoleSelect = document.getElementById("new-user-role");
 const createUserContactInput = document.getElementById("new-user-contact");
 const createUserMessage = document.getElementById("create-user-message");
 const allUsersList = document.getElementById("all-users-list");
-const createTaskForm = document.getElementById("create-task-form");
-const newTaskTitleInput = document.getElementById("new-task-title");
-const newTaskDescriptionTextarea = document.getElementById(
-  "new-task-description"
-);
-const newTaskDeadlineInput = document.getElementById("new-task-deadline");
-const newTaskPrioritySelect = document.getElementById("new-task-priority");
-const newTaskAssignToSelect = document.getElementById("new-task-assign-to");
-const createTaskMessage = document.getElementById("create-task-message");
+const createTaskForm = document.getElementById("task-form");
+console.log("createTaskForm:", createTaskForm);
+const newTaskTitleInput = document.getElementById("task-title");
+const newTaskDescriptionTextarea = document.getElementById("task-desc");
+const newTaskDeadlineInput = document.getElementById("task-deadline");
+const newTaskPrioritySelect = document.getElementById("task-priority");
+// const newTaskAssignToSelect = document.getElementById("task-assign-to"); // Not used - uses checkboxes instead
+const createTaskMessage = document.getElementById("task-message");
 const adminTaskStatusFilter = document.getElementById(
   "admin-task-status-filter"
 );
@@ -1436,44 +1441,67 @@ async function deleteUser(userId) {
 async function populateAdminTaskAssignToSelect() {
   try {
     const users = await apiRequest("/users", "GET");
-    newTaskAssignToSelect.innerHTML = '<option value="">None</option>';
-    users.forEach((user) => {
-      if (user.role === "volunteer" || user.role === "coordinator") {
-        const option = document.createElement("option");
-        option.value = user.user_id;
-        option.textContent = `${user.name} (${user.role})`;
-        newTaskAssignToSelect.appendChild(option);
-      }
-    });
+    const volunteerCheckboxes = document.getElementById("volunteer-checkboxes");
+    if (volunteerCheckboxes) {
+      volunteerCheckboxes.innerHTML = "";
+      users.forEach((user) => {
+        if (user.role === "volunteer" || user.role === "coordinator") {
+          const checkboxDiv = document.createElement("div");
+          checkboxDiv.style.display = "flex";
+          checkboxDiv.style.alignItems = "center";
+          checkboxDiv.style.gap = "8px";
+          
+          const checkbox = document.createElement("input");
+          checkbox.type = "checkbox";
+          checkbox.value = user.user_id;
+          checkbox.id = `volunteer-${user.user_id}`;
+          
+          const label = document.createElement("label");
+          label.htmlFor = `volunteer-${user.user_id}`;
+          label.textContent = `${user.name} (${user.role})`;
+          label.style.fontSize = "14px";
+          label.style.color = "#333";
+          
+          checkboxDiv.appendChild(checkbox);
+          checkboxDiv.appendChild(label);
+          volunteerCheckboxes.appendChild(checkboxDiv);
+        }
+      });
+    }
   } catch (error) {
-    console.error("Error populating admin task assign-to select:", error);
+    console.error("Error populating admin task volunteer checkboxes:", error);
   }
 }
 
 if (createTaskForm) {
+  console.log("createTaskForm found, adding event listener");
   createTaskForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const title = newTaskTitleInput.value;
-  const description = newTaskDescriptionTextarea.value;
-  const deadline = newTaskDeadlineInput.value;
-  const priority = newTaskPrioritySelect.value;
-  const assignedTo = newTaskAssignToSelect.value || null;
+    e.preventDefault();
+    const title = newTaskTitleInput.value;
+    const description = newTaskDescriptionTextarea.value;
+    const deadline = newTaskDeadlineInput.value;
+    const priority = newTaskPrioritySelect.value;
+    // Get selected volunteers from checkboxes
+  const volunteerCheckboxes = document.querySelectorAll('#volunteer-checkboxes input[type="checkbox"]:checked');
+  const assignedVolunteers = Array.from(volunteerCheckboxes).map(cb => cb.value);
+  const assignedTo = assignedVolunteers.length > 0 ? assignedVolunteers[0] : null; // Use first volunteer as primary assignee
 
-  try {
-    const result = await apiRequest("/tasks/create", "POST", {
-      title,
-      description,
-      deadline,
-      priority,
-      assigned_to: assignedTo,
-    });
-    showMessage(createTaskMessage, result.message, "success");
-    createTaskForm.reset();
-    fetchAllTasks(); // Refresh list
-    populateCoordinatorTaskSelects(); // Refresh for coordinator
-  } catch (error) {
-    showMessage(createTaskMessage, error.message, "error");
-  }
+    try {
+      const result = await apiRequest("/tasks/create", "POST", {
+        title,
+        description,
+        deadline,
+        priority,
+        assigned_to: assignedTo,
+        assigned_volunteers: assignedVolunteers,
+      });
+      showMessage(createTaskMessage, result.message, "success");
+      createTaskForm.reset();
+      fetchAllTasks(); // Refresh list
+      populateCoordinatorTaskSelects(); // Refresh for coordinator
+    } catch (error) {
+      showMessage(createTaskMessage, error.message, "error");
+    }
   });
 }
 
@@ -1849,23 +1877,23 @@ async function deleteRating(ratingId) {
 
 if (logExpenseForm) {
   logExpenseForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const taskId = expenseTaskIdSelect.value;
-  const amount = parseFloat(expenseAmountInput.value);
-  const category = expenseCategoryInput.value;
+    e.preventDefault();
+    const taskId = expenseTaskIdSelect.value;
+    const amount = parseFloat(expenseAmountInput.value);
+    const category = expenseCategoryInput.value;
 
-  try {
-    const result = await apiRequest("/expenses/log", "POST", {
-      task_id: taskId,
-      amount,
-      category,
-    });
-    showMessage(logExpenseMessage, result.message, "success");
-    logExpenseForm.reset();
-    fetchAllExpenses(); // Refresh list
-  } catch (error) {
-    showMessage(logExpenseMessage, error.message, "error");
-  }
+    try {
+      const result = await apiRequest("/expenses/log", "POST", {
+        task_id: taskId,
+        amount,
+        category,
+      });
+      showMessage(logExpenseMessage, result.message, "success");
+      logExpenseForm.reset();
+      fetchAllExpenses(); // Refresh list
+    } catch (error) {
+      showMessage(logExpenseMessage, error.message, "error");
+    }
   });
 }
 
