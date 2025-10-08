@@ -1272,104 +1272,106 @@
       //   }
       // });
 
-      // Google Login
-      googleLoginBtn.addEventListener("click", async () => {
-        try {
-          console.log("Starting Google login...");
-          console.log("Firebase config:", firebaseConfig);
-          console.log("Google provider:", googleProvider);
-          console.log("Auth object:", auth);
-          console.log("Current user before login:", auth.currentUser);
+      // Google Login (moved to script.js)
+      // googleLoginBtn.addEventListener("click", async () => {
+      //   try {
+      //     console.log("Starting Google login...");
+      //     console.log("Firebase config:", firebaseConfig);
+      //     console.log("Google provider:", googleProvider);
+      //     console.log("Auth object:", auth);
+      //     console.log("Current user before login:", auth.currentUser);
 
-          const result = await auth.signInWithPopup(googleProvider);
-          console.log("Google popup result:", result);
-          console.log("User object:", result.user);
-          console.log("User email:", result.user.email);
-          console.log("User display name:", result.user.displayName);
+      //     const result = await auth.signInWithPopup(googleProvider);
+      //     console.log("Google popup result:", result);
+      //     console.log("User object:", result.user);
+      //     console.log("User email:", result.user.email);
+      //     console.log("User display name:", result.user.displayName);
 
-          const idToken = await result.user.getIdToken();
-          console.log("Got ID token:", idToken ? "Yes" : "No");
-          console.log("ID token length:", idToken ? idToken.length : 0);
+      //     const idToken = await result.user.getIdToken();
+      //     console.log("Got ID token:", idToken ? "Yes" : "No");
+      //     console.log("ID token length:", idToken ? idToken.length : 0);
 
-          const response = await apiRequest("/auth/google", "POST", {
-            id_token: idToken,
-          });
-          console.log("Backend response:", response);
+      //     const response = await apiRequest("/auth/google", "POST", {
+      //       id_token: idToken,
+      //     });
+      //     console.log("Backend response:", response);
 
-          if (response && response.redirect_to) {
-            window.location.href = response.redirect_to;
-          }
-        } catch (error) {
-          console.error("Google login error:", error);
-          console.error("Error code:", error.code);
-          console.error("Error message:", error.message);
-          console.error("Full error object:", error);
+      //     if (response && response.redirect_to) {
+      //       window.location.href = response.redirect_to;
+      //     }
+      //   } catch (error) {
+      //     console.error("Google login error:", error);
+      //     console.error("Error code:", error.code);
+      //     console.error("Error message:", error.message);
+      //     console.error("Full error object:", error);
 
-          let errorMessage = "Google login failed. Please try again.";
+      //     let errorMessage = "Google login failed. Please try again.";
 
-          if (error.code === "auth/popup-closed-by-user") {
-            errorMessage = "Google login was cancelled. Please try again.";
-          } else if (error.code === "auth/popup-blocked") {
-            errorMessage =
-              "Popup was blocked. Please allow popups and try again.";
-          } else if (error.code === "auth/network-request-failed") {
-            errorMessage =
-              "Network error. Please check your connection and try again.";
-          } else if (error.code === "auth/operation-not-allowed") {
-            errorMessage =
-              "Google sign-in is not enabled. Please contact support.";
-          } else if (error.code === "auth/unauthorized-domain") {
-            errorMessage = "This domain is not authorized for Google sign-in.";
-          } else if (error.code === "auth/configuration-not-found") {
-            errorMessage =
-              "Firebase configuration error. Please contact support.";
-          }
+      //     if (error.code === "auth/popup-closed-by-user") {
+      //       errorMessage = "Google login was cancelled. Please try again.";
+      //     } else if (error.code === "auth/popup-blocked") {
+      //       errorMessage =
+      //         "Popup was blocked. Please allow popups and try again.";
+      //     } else if (error.code === "auth/network-request-failed") {
+      //       errorMessage =
+      //         "Network error. Please check your connection and try again.";
+      //     } else if (error.code === "auth/operation-not-allowed") {
+      //       errorMessage =
+      //         "Google sign-in is not enabled. Please contact support.";
+      //     } else if (error.code === "auth/unauthorized-domain") {
+      //       errorMessage = "This domain is not authorized for Google sign-in.";
+      //     } else if (error.code === "auth/configuration-not-found") {
+      //       errorMessage =
+      //         "Firebase configuration error. Please contact support.";
+      //     }
 
-          showMessage(loginMessage, errorMessage, "error");
-        }
-      });
+      //     showMessage(loginMessage, errorMessage, "error");
+      //   }
+      // });
 
-      // Google Register
-      googleRegisterBtn.addEventListener("click", async () => {
-        try {
-          console.log("Starting Google registration...");
-          const result = await auth.signInWithPopup(googleProvider);
-          console.log("Google popup result:", result);
+      // Google Register (moved to script.js)
+      // googleRegisterBtn.addEventListener("click", async () => {
+      //   try {
+      //     console.log("Starting Google registration...");
+      //     const result = await auth.signInWithPopup(googleProvider);
+      //     console.log("Google popup result:", result);
 
-          const idToken = await result.user.getIdToken();
-          console.log("Got ID token:", idToken ? "Yes" : "No");
+      //     const idToken = await result.user.getIdToken();
+      //     console.log("Got ID token:", idToken ? "Yes" : "No");
 
-          const role = registerForm ? registerForm.role.value || "volunteer" : "volunteer";
-          const contact = registerForm ? registerForm.contact.value || "" : "";
+      //     const role = registerForm
+      //       ? registerForm.role.value || "volunteer"
+      //       : "volunteer";
+      //     const contact = registerForm ? registerForm.contact.value || "" : "";
 
-          const response = await apiRequest("/auth/google/register", "POST", {
-            id_token: idToken,
-            role: role,
-            contact: contact,
-          });
-          console.log("Backend response:", response);
+      //     const response = await apiRequest("/auth/google/register", "POST", {
+      //       id_token: idToken,
+      //       role: role,
+      //       contact: contact,
+      //     });
+      //     console.log("Backend response:", response);
 
-          if (response && response.redirect_to) {
-            window.location.href = response.redirect_to;
-          }
-        } catch (error) {
-          console.error("Google registration error:", error);
-          let errorMessage = "Google registration failed. Please try again.";
+      //     if (response && response.redirect_to) {
+      //       window.location.href = response.redirect_to;
+      //     }
+      //   } catch (error) {
+      //     console.error("Google registration error:", error);
+      //     let errorMessage = "Google registration failed. Please try again.";
 
-          if (error.code === "auth/popup-closed-by-user") {
-            errorMessage =
-              "Google registration was cancelled. Please try again.";
-          } else if (error.code === "auth/popup-blocked") {
-            errorMessage =
-              "Popup was blocked. Please allow popups and try again.";
-          } else if (error.code === "auth/network-request-failed") {
-            errorMessage =
-              "Network error. Please check your connection and try again.";
-          }
+      //     if (error.code === "auth/popup-closed-by-user") {
+      //       errorMessage =
+      //         "Google registration was cancelled. Please try again.";
+      //     } else if (error.code === "auth/popup-blocked") {
+      //       errorMessage =
+      //         "Popup was blocked. Please allow popups and try again.";
+      //     } else if (error.code === "auth/network-request-failed") {
+      //       errorMessage =
+      //         "Network error. Please check your connection and try again.";
+      //     }
 
-          showMessage(registerMessage, errorMessage, "error");
-        }
-      });
+      //     showMessage(registerMessage, errorMessage, "error");
+      //   }
+      // });
 
       // Test Firebase connection
       function testFirebaseConnection() {

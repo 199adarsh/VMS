@@ -90,6 +90,79 @@ if (registerForm) {
   });
 }
 
+// Google Login Event Listener
+if (googleLoginBtn) {
+  googleLoginBtn.addEventListener("click", async () => {
+    try {
+      console.log("Starting Google login...");
+      const result = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      const idToken = await result.user.getIdToken();
+      
+      const response = await apiRequest("/auth/google", "POST", {
+        id_token: idToken,
+      });
+      
+      if (response && response.redirect_to) {
+        window.location.href = response.redirect_to;
+      }
+    } catch (error) {
+      console.error("Google login error:", error);
+      let errorMessage = "Google login failed. Please try again.";
+      
+      if (error.code === "auth/popup-closed-by-user") {
+        errorMessage = "Google login was cancelled. Please try again.";
+      } else if (error.code === "auth/popup-blocked") {
+        errorMessage = "Popup was blocked. Please allow popups and try again.";
+      } else if (error.code === "auth/unauthorized-domain") {
+        errorMessage = "This domain is not authorized for Google sign-in.";
+      }
+      
+      if (loginMessage) {
+        showMessage(loginMessage, errorMessage, "error");
+      }
+    }
+  });
+}
+
+// Google Register Event Listener
+if (googleRegisterBtn) {
+  googleRegisterBtn.addEventListener("click", async () => {
+    try {
+      console.log("Starting Google registration...");
+      const result = await firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider());
+      const idToken = await result.user.getIdToken();
+      
+      const role = registerForm ? registerForm.role.value || "volunteer" : "volunteer";
+      const contact = registerForm ? registerForm.contact.value || "" : "";
+      
+      const response = await apiRequest("/auth/google/register", "POST", {
+        id_token: idToken,
+        role: role,
+        contact: contact,
+      });
+      
+      if (response && response.redirect_to) {
+        window.location.href = response.redirect_to;
+      }
+    } catch (error) {
+      console.error("Google registration error:", error);
+      let errorMessage = "Google registration failed. Please try again.";
+      
+      if (error.code === "auth/popup-closed-by-user") {
+        errorMessage = "Google registration was cancelled. Please try again.";
+      } else if (error.code === "auth/popup-blocked") {
+        errorMessage = "Popup was blocked. Please allow popups and try again.";
+      } else if (error.code === "auth/unauthorized-domain") {
+        errorMessage = "This domain is not authorized for Google sign-in.";
+      }
+      
+      if (registerMessage) {
+        showMessage(registerMessage, errorMessage, "error");
+      }
+    }
+  });
+}
+
 // Volunteer Specific Elements
 const assignedTasksList = document.getElementById("assigned-tasks-list");
 const myAttendanceHistory = document.getElementById("my-attendance-history");
@@ -1377,7 +1450,8 @@ async function populateAdminTaskAssignToSelect() {
   }
 }
 
-createTaskForm.addEventListener("submit", async (e) => {
+if (createTaskForm) {
+  createTaskForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const title = newTaskTitleInput.value;
   const description = newTaskDescriptionTextarea.value;
@@ -1400,7 +1474,8 @@ createTaskForm.addEventListener("submit", async (e) => {
   } catch (error) {
     showMessage(createTaskMessage, error.message, "error");
   }
-});
+  });
+}
 
 async function fetchAllTasks() {
   try {
@@ -1642,7 +1717,9 @@ if (adminAttendanceResetBtn) {
   });
 }
 
-getAbsenteesBtn.addEventListener("click", fetchAbsentees);
+if (getAbsenteesBtn) {
+  getAbsenteesBtn.addEventListener("click", fetchAbsentees);
+}
 async function fetchAbsentees() {
   try {
     const absentees = await apiRequest("/attendance/absentees", "GET");
@@ -1770,7 +1847,8 @@ async function deleteRating(ratingId) {
   }
 }
 
-logExpenseForm.addEventListener("submit", async (e) => {
+if (logExpenseForm) {
+  logExpenseForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const taskId = expenseTaskIdSelect.value;
   const amount = parseFloat(expenseAmountInput.value);
@@ -1788,7 +1866,8 @@ logExpenseForm.addEventListener("submit", async (e) => {
   } catch (error) {
     showMessage(logExpenseMessage, error.message, "error");
   }
-});
+  });
+}
 
 async function fetchAllExpenses() {
   try {
