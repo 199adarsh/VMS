@@ -37,6 +37,59 @@ if (showLoginBtn) {
   });
 }
 
+// Login Form Event Listener
+if (loginForm) {
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = loginForm.email.value;
+    const password = loginForm.password.value;
+
+    try {
+      const response = await apiRequest("/login", "POST", {
+        email,
+        password,
+      });
+      if (response && response.redirect_to) {
+        window.location.href = response.redirect_to;
+      }
+    } catch (error) {
+      if (loginMessage) {
+        showMessage(loginMessage, error.message, "error");
+      }
+    }
+  });
+}
+
+// Register Form Event Listener
+if (registerForm) {
+  registerForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = registerForm.name.value;
+    const email = registerForm.email.value;
+    const password = registerForm.password.value;
+    const contact = registerForm.contact.value;
+    const role = registerForm.role.value;
+
+    try {
+      const response = await apiRequest("/register", "POST", {
+        name,
+        email,
+        password,
+        contact,
+        role,
+        provider: "email",
+      });
+      if (response && response.redirect_to) {
+        window.location.href = response.redirect_to;
+      }
+    } catch (error) {
+      if (registerMessage) {
+        showMessage(registerMessage, error.message, "error");
+      }
+    }
+  });
+}
+
 // Volunteer Specific Elements
 const assignedTasksList = document.getElementById("assigned-tasks-list");
 const myAttendanceHistory = document.getElementById("my-attendance-history");
@@ -1130,7 +1183,8 @@ async function fetchCoordinatorReports() {
 
 // --- Admin Functions ---
 
-createUserForm.addEventListener("submit", async (e) => {
+if (createUserForm) {
+  createUserForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = createUserNameInput.value;
   const email = createUserEmailInput.value;
@@ -1152,7 +1206,8 @@ createUserForm.addEventListener("submit", async (e) => {
   } catch (error) {
     showMessage(createUserMessage, error.message, "error");
   }
-});
+  });
+}
 
 async function fetchAllUsers() {
   try {
