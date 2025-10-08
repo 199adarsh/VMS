@@ -8,6 +8,7 @@ class DatabaseService:
     
     def __init__(self):
         self.db = get_firestore_db()
+        self.fallback_storage = {}  # In-memory fallback storage
         self.collections = {
             'users': 'users',
             'tasks': 'tasks', 
@@ -20,6 +21,45 @@ class DatabaseService:
             'attendance_sessions': 'attendance_sessions',
             'announcements': 'announcements'
         }
+        
+        # If Firebase is not available, initialize with test users
+        if not self.db:
+            self._initialize_fallback_users()
+    
+    def _initialize_fallback_users(self):
+        """Initialize fallback users when Firebase is not available"""
+        test_users = [
+            {
+                "user_id": "test_admin_1",
+                "name": "Admin One",
+                "email": "admin1@example.com",
+                "password": "password123",
+                "role": "admin",
+                "contact": "1234567892",
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "user_id": "test_coord_1", 
+                "name": "Coordinator One",
+                "email": "coordinator1@example.com",
+                "password": "password123",
+                "role": "coordinator",
+                "contact": "1234567891",
+                "created_at": datetime.now().isoformat()
+            },
+            {
+                "user_id": "test_vol_1",
+                "name": "Volunteer One",
+                "email": "volunteer1@example.com", 
+                "password": "password123",
+                "role": "volunteer",
+                "contact": "1234567890",
+                "created_at": datetime.now().isoformat()
+            }
+        ]
+        
+        self.fallback_storage['users'] = {user['email']: user for user in test_users}
+        print(f"Initialized {len(test_users)} fallback users")
     
     def _get_collection_ref(self, collection_name: str):
         """Get Firestore collection reference"""
@@ -53,7 +93,8 @@ class DatabaseService:
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
         """Get user by email"""
         if not self.db:
-            return None
+            # Use fallback storage
+            return self.fallback_storage.get('users', {}).get(email)
         
         users_ref = self._get_collection_ref('users')
         query = users_ref.where('email', '==', email).limit(1)
@@ -66,7 +107,8 @@ class DatabaseService:
     def get_all_users(self) -> List[Dict[str, Any]]:
         """Get all users"""
         if not self.db:
-            return []
+            # Use fallback storage
+            return list(self.fallback_storage.get('users', {}).values())
         
         users_ref = self._get_collection_ref('users')
         docs = users_ref.stream()
