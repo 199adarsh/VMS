@@ -15,6 +15,8 @@ CORS(app, origins=["*"], supports_credentials=True)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your_super_secret_key') # Use environment variable in production
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 
 
 def login_required(f):
@@ -50,6 +52,7 @@ def role_required(allowed_roles):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
+            print(f'DEBUG: role_required check. Session: {dict(session)}')
             if 'user_id' not in session:
                 print('DEBUG: No user_id in session')
                 return jsonify({"message": "Unauthorized: Login required"}), 401
@@ -388,6 +391,16 @@ def test_endpoint():
         'message': 'API is working!',
         'status': 'success',
         'timestamp': datetime.now().isoformat()
+    }), 200
+
+@app.route('/test-session', methods=['GET'])
+def test_session():
+    """Test session status"""
+    return jsonify({
+        'session_data': dict(session),
+        'user_id_in_session': 'user_id' in session,
+        'role_in_session': 'role' in session,
+        'session_keys': list(session.keys())
     }), 200
 
 @app.route('/test-firebase-auth', methods=['GET'])
@@ -1524,7 +1537,9 @@ def coordinator_dashboard_summary():
 @app.route('/dashboard/admin', methods=['GET'])
 @role_required(['admin'])
 def admin_dashboard_summary():
+    print(f"Admin dashboard called. Session: {dict(session)}")
     user = db_service.get_user(session['user_id'])
+    print(f"User data: {user}")
     # Attendance % (average of all volunteers)
     volunteers = db_service.get_users_by_role('volunteer')
     volunteer_ids = [v['user_id'] for v in volunteers]
