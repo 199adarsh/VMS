@@ -2075,19 +2075,7 @@
       // --- Role detection (from Jinja) ---
       const USER_ROLE = "{{ current_user.role }}";
 
-      // --- Tab switching logic ---
-      const tabButtons = document.querySelectorAll(".tab-button");
-      const tabContents = document.querySelectorAll(".tab-content");
-      tabButtons.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          tabButtons.forEach((b) => b.classList.remove("active"));
-          btn.classList.add("active");
-          const tabId = btn.getAttribute("data-tab");
-          tabContents.forEach((tc) => tc.classList.remove("active"));
-          document.getElementById(tabId).classList.add("active");
-          loadTabData(tabId);
-        });
-      });
+      // --- Tab switching logic (handled by script.js) ---
       // --- Logout button logic ---
       const logoutBtn = document.getElementById("logout-button");
       if (logoutBtn) {
