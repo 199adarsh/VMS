@@ -94,12 +94,19 @@ def dashbords():
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
-    return_token = data.get('return_token', False)  # Option to return JWT token
+    try:
+        print("Login attempt received")
+        data = request.get_json()
+        print(f"Login data: {data}")
+        email = data.get('email')
+        password = data.get('password')
+        return_token = data.get('return_token', False)  # Option to return JWT token
 
-    user = db_service.get_user_by_email(email)
+        user = db_service.get_user_by_email(email)
+        print(f"User found: {user is not None}")
+    except Exception as e:
+        print(f"Login error: {e}")
+        return jsonify({"message": f"Login error: {str(e)}"}), 500
     
     if user and user.get('password') == password:
         session['user_id'] = user['user_id']
@@ -370,7 +377,17 @@ def health_check():
         'status': 'healthy',
         'firebase_connected': db_service.db is not None,
         'environment': 'production' if os.getenv('FIREBASE_PROJECT_ID') else 'development',
-        'firebase_admin_initialized': len(firebase_admin._apps) > 0
+        'firebase_admin_initialized': len(firebase_admin._apps) > 0,
+        'message': 'API is working'
+    }), 200
+
+@app.route('/test', methods=['GET'])
+def test_endpoint():
+    """Simple test endpoint to verify API is working"""
+    return jsonify({
+        'message': 'API is working!',
+        'status': 'success',
+        'timestamp': datetime.now().isoformat()
     }), 200
 
 @app.route('/test-firebase', methods=['GET'])
@@ -404,13 +421,23 @@ def volunteer_assigned_tasks():
     return jsonify(assigned_tasks), 200
 
 @app.route('/tasks/<task_id>', methods=['GET'])
-@role_required(['volunteer'])
-def volunteer_view_specific_task(task_id):
+@role_required(['volunteer', 'coordinator', 'admin'])
+def get_task_details(task_id):
     current_user_id = session['user_id']
+    current_user_role = session.get('role')
     task = db_service.get_task(task_id)
-    if task and task.get('assigned_to') == current_user_id:
-        return jsonify(task), 200
-    return jsonify({"message": "Task not found or not assigned to you"}), 404
+    
+    if not task:
+        return jsonify({"message": "Task not found"}), 404
+    
+    # Volunteers can only see tasks assigned to them
+    if current_user_role == 'volunteer':
+        assigned_volunteers = task.get('assigned_volunteers', [])
+        if task.get('assigned_to') != current_user_id and current_user_id not in assigned_volunteers:
+            return jsonify({"message": "Task not assigned to you"}), 403
+    
+    # Coordinators and admins can see any task
+    return jsonify(task), 200
 
 @app.route('/tasks/update_status/<task_id>', methods=['PUT'])
 @role_required(['volunteer'])
@@ -425,40 +452,51 @@ def volunteer_mark_task_completed(task_id):
     data = request.get_json()
     new_status = data.get('status')
     if new_status == "Completed":
-        db_service.update_task(task_id, {"status": "Completed"})
+        db_service.update_task(task_id, {"status": "Completed", "completion_percentage": 100})
         task['status'] = "Completed"
+        task['completion_percentage'] = 100
         return jsonify({"message": f"Task {task_id} marked as Completed", "task": task}), 200
     return jsonify({"message": "Invalid status update"}), 400
 
-@app.route('/attendance/submit', methods=['POST'])
+@app.route('/tasks/update_completion/<task_id>', methods=['PUT'])
 @role_required(['volunteer'])
-def volunteer_submit_attendance():
+def volunteer_update_task_completion(task_id):
+    """Update task completion percentage (0-100%)"""
     current_user_id = session['user_id']
-    data = request.get_json()
-    task_id = data.get('task_id')
-    date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
-
-    if not task_id:
-        return jsonify({"message": "Task ID is required"}), 400
     task = db_service.get_task(task_id)
     if not task:
-        return jsonify({"message": "Invalid Task ID"}), 400
+        return jsonify({"message": "Task not found"}), 404
     if task.get('assigned_to') != current_user_id:
-        return jsonify({"message": "You can only submit attendance for tasks assigned to you."}), 403
+        return jsonify({"message": "Forbidden: Cannot update tasks not assigned to you"}), 403
 
-    # Prevent duplicate attendance for same user, task, date
-    if db_service.check_attendance_exists(current_user_id, task_id, date):
-        return jsonify({"message": "Attendance already submitted for this task and date."}), 409
+    data = request.get_json()
+    completion_percentage = data.get('completion_percentage')
+    
+    if completion_percentage is None:
+        return jsonify({"message": "Completion percentage is required"}), 400
+    
+    try:
+        completion_percentage = int(completion_percentage)
+    except (ValueError, TypeError):
+        return jsonify({"message": "Completion percentage must be a number"}), 400
+    
+    if not (0 <= completion_percentage <= 100):
+        return jsonify({"message": "Completion percentage must be between 0 and 100"}), 400
 
-    new_log_id = db_service.create_attendance_log({"log_id": f"att{uuid.uuid4().hex[:8]}", "user_id": current_user_id, "task_id": task_id, "date": date})
-    return jsonify({"message": "Attendance submitted successfully", "log_id": new_log_id}), 201
+    # Update task completion
+    success = db_service.update_task_completion(task_id, completion_percentage)
+    if not success:
+        return jsonify({"message": "Failed to update task completion"}), 500
+    
+    # Get updated task
+    updated_task = db_service.get_task(task_id)
+    
+    return jsonify({
+        "message": f"Task completion updated to {completion_percentage}%", 
+        "task": updated_task
+    }), 200
 
-@app.route('/attendance/my', methods=['GET'])
-@role_required(['volunteer'])
-def volunteer_my_attendance():
-    current_user_id = session['user_id']
-    my_attendance = db_service.get_attendance_logs(user_id=current_user_id)
-    return jsonify(my_attendance), 200
+
 
 @app.route('/ratings/my', methods=['GET'])
 @role_required(['volunteer'])
@@ -466,6 +504,91 @@ def volunteer_my_ratings():
     current_user_id = session['user_id']
     my_ratings = db_service.get_ratings(volunteer_id=current_user_id)
     return jsonify(my_ratings), 200
+
+@app.route('/attendance/my', methods=['GET'])
+@role_required(['volunteer'])
+def volunteer_my_attendance():
+    """Get volunteer's personal attendance history"""
+    current_user_id = session['user_id']
+    
+    # Get query parameters for filtering
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    event_id = request.args.get('event_id')
+    
+    try:
+        # Get attendance logs
+        attendance_logs = db_service.get_attendance_logs(
+            user_id=current_user_id, 
+            event_id=event_id
+        )
+        
+        # Get absentee logs
+        absentee_logs = db_service.get_absentee_logs(
+            user_id=current_user_id,
+            event_id=event_id
+        )
+        
+        # Filter by date range if provided
+        if start_date and end_date:
+            attendance_logs = [
+                log for log in attendance_logs 
+                if start_date <= log.get('date', '') <= end_date
+            ]
+            absentee_logs = [
+                log for log in absentee_logs 
+                if start_date <= log.get('date', '') <= end_date
+            ]
+        
+        # Get task information for each record
+        all_tasks = db_service.get_all_tasks()
+        tasks_dict = {task['task_id']: task for task in all_tasks}
+        
+        # Combine and format attendance records
+        all_records = []
+        
+        # Add present records
+        for log in attendance_logs:
+            task = tasks_dict.get(log.get('task_id', ''), {})
+            all_records.append({
+                'record_id': log.get('log_id'),
+                'date': log.get('date'),
+                'status': 'Present',
+                'task_title': task.get('title', 'N/A'),
+                'task_id': log.get('task_id'),
+                'event_id': log.get('event_id'),
+                'remark': log.get('remark', ''),
+                'marked_by': log.get('marked_by'),
+                'created_at': log.get('created_at')
+            })
+        
+        # Add absent records
+        for log in absentee_logs:
+            task = tasks_dict.get(log.get('task_id', ''), {})
+            all_records.append({
+                'record_id': log.get('log_id'),
+                'date': log.get('date'),
+                'status': 'Absent',
+                'task_title': task.get('title', 'N/A'),
+                'task_id': log.get('task_id'),
+                'event_id': log.get('event_id'),
+                'remark': log.get('remark', ''),
+                'marked_by': log.get('marked_by'),
+                'created_at': log.get('created_at')
+            })
+        
+        # Sort by date (most recent first)
+        all_records.sort(key=lambda x: x.get('date', ''), reverse=True)
+        
+        return jsonify({
+            'attendance_records': all_records,
+            'total_records': len(all_records),
+            'present_count': len(attendance_logs),
+            'absent_count': len(absentee_logs)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"message": f"Error fetching attendance history: {str(e)}"}), 500
 
 @app.route('/profile', methods=['GET'])
 @role_required(['volunteer', 'coordinator', 'admin'])
@@ -537,23 +660,90 @@ def assign_task_to_volunteer():
 
     return jsonify({"message": "Task assigned successfully", "task": task}), 200
 
-@app.route('/tasks/reassign_volunteer/<task_id>', methods=['PUT'])
-@role_required(['coordinator'])
-def reassign_task_to_volunteer(task_id):
+@app.route('/tasks/assign_multiple', methods=['POST'])
+@role_required(['coordinator', 'admin'])
+def assign_multiple_volunteers():
+    """Assign multiple volunteers to a task"""
     data = request.get_json()
-    new_volunteer_id = data.get('volunteer_id')
+    task_id = data.get('task_id')
+    volunteer_ids = data.get('volunteer_ids', [])
+
+    if not task_id or not volunteer_ids:
+        return jsonify({"message": "Task ID and volunteer IDs are required"}), 400
 
     task = db_service.get_task(task_id)
     if not task:
         return jsonify({"message": "Task not found"}), 404
 
-    new_volunteer = db_service.get_user(new_volunteer_id)
-    if not new_volunteer or new_volunteer['role'] != 'volunteer':
-        return jsonify({"message": "Invalid new Volunteer ID"}), 400
+    # Validate all volunteers exist and are volunteers
+    for volunteer_id in volunteer_ids:
+        volunteer = db_service.get_user(volunteer_id)
+        if not volunteer or volunteer['role'] != 'volunteer':
+            return jsonify({"message": f"Invalid volunteer ID: {volunteer_id}"}), 400
 
-    db_service.update_task(task_id, {'assigned_to': new_volunteer_id})
-    task['assigned_to'] = new_volunteer_id
-    return jsonify({"message": "Task reassigned successfully", "task": task}), 200
+    success = db_service.assign_multiple_volunteers(task_id, volunteer_ids)
+    if success:
+        updated_task = db_service.get_task(task_id)
+        return jsonify({
+            "message": f"Task assigned to {len(volunteer_ids)} volunteers successfully", 
+            "task": updated_task
+        }), 200
+    else:
+        return jsonify({"message": "Failed to assign volunteers"}), 500
+
+@app.route('/tasks/add_volunteer', methods=['POST'])
+@role_required(['coordinator', 'admin'])
+def add_volunteer_to_task():
+    """Add a volunteer to an existing task"""
+    data = request.get_json()
+    task_id = data.get('task_id')
+    volunteer_id = data.get('volunteer_id')
+
+    if not task_id or not volunteer_id:
+        return jsonify({"message": "Task ID and volunteer ID are required"}), 400
+
+    task = db_service.get_task(task_id)
+    if not task:
+        return jsonify({"message": "Task not found"}), 404
+
+    volunteer = db_service.get_user(volunteer_id)
+    if not volunteer or volunteer['role'] != 'volunteer':
+        return jsonify({"message": "Invalid volunteer ID"}), 400
+
+    success = db_service.add_volunteer_to_task(task_id, volunteer_id)
+    if success:
+        updated_task = db_service.get_task(task_id)
+        return jsonify({
+            "message": "Volunteer added to task successfully", 
+            "task": updated_task
+        }), 200
+    else:
+        return jsonify({"message": "Failed to add volunteer"}), 500
+
+@app.route('/tasks/remove_volunteer', methods=['POST'])
+@role_required(['coordinator', 'admin'])
+def remove_volunteer_from_task():
+    """Remove a volunteer from a task"""
+    data = request.get_json()
+    task_id = data.get('task_id')
+    volunteer_id = data.get('volunteer_id')
+
+    if not task_id or not volunteer_id:
+        return jsonify({"message": "Task ID and volunteer ID are required"}), 400
+
+    task = db_service.get_task(task_id)
+    if not task:
+        return jsonify({"message": "Task not found"}), 404
+
+    success = db_service.remove_volunteer_from_task(task_id, volunteer_id)
+    if success:
+        updated_task = db_service.get_task(task_id)
+        return jsonify({
+            "message": "Volunteer removed from task successfully", 
+            "task": updated_task
+        }), 200
+    else:
+        return jsonify({"message": "Failed to remove volunteer"}), 500
 
 @app.route('/attendance', methods=['GET'])
 @role_required(['coordinator', 'admin'])
@@ -569,11 +759,50 @@ def get_attendance_logs():
             volunteer = db_service.get_user(volunteer_id)
             if volunteer and volunteer['role'] != 'volunteer':
                 return jsonify({"message": "Coordinators can only view volunteer attendance"}), 403
-        filtered_logs = db_service.get_attendance_logs(user_id=volunteer_id, date=date_filter)
+        attendance_logs = db_service.get_attendance_logs(user_id=volunteer_id, date=date_filter)
+        absentee_logs = db_service.get_absentee_logs(user_id=volunteer_id, date=date_filter)
     else:
-        filtered_logs = db_service.get_attendance_logs(date=date_filter)
+        attendance_logs = db_service.get_attendance_logs(date=date_filter)
+        absentee_logs = db_service.get_absentee_logs(date=date_filter)
 
-    return jsonify(filtered_logs), 200
+    # Get all users for name lookup
+    all_users = db_service.get_users_by_role('volunteer') + db_service.get_users_by_role('coordinator')
+    user_lookup = {user['user_id']: user['name'] for user in all_users}
+    
+    # Combine attendance and absentee records
+    all_records = []
+    
+    # Add present records
+    for log in attendance_logs:
+        user_id = log.get('user_id')
+        all_records.append({
+            'user_id': user_id,
+            'name': user_lookup.get(user_id, user_id),
+            'event_id': log.get('event_id'),
+            'task_id': log.get('task_id'),
+            'date': log.get('date'),
+            'status': 'present',
+            'remark': log.get('remark', ''),
+            'created_at': log.get('created_at'),
+            'marked_by': log.get('marked_by')
+        })
+    
+    # Add absent records
+    for log in absentee_logs:
+        user_id = log.get('user_id')
+        all_records.append({
+            'user_id': user_id,
+            'name': user_lookup.get(user_id, user_id),
+            'event_id': log.get('event_id'),
+            'task_id': log.get('task_id'),
+            'date': log.get('date'),
+            'status': 'absent',
+            'remark': log.get('remark', ''),
+            'created_at': log.get('created_at'),
+            'marked_by': log.get('marked_by')
+        })
+
+    return jsonify(all_records), 200
 
 @app.route('/ratings/add', methods=['POST'])
 @role_required(['coordinator', 'admin'])
@@ -725,7 +954,7 @@ def report_expenses():
 # --- ADMIN ROLE ENDPOINTS ---
 
 @app.route('/users', methods=['GET'])
-@role_required(['admin'])
+@role_required(['admin', 'coordinator'])
 def get_all_users():
     users_list = db_service.get_all_users()
     # Remove passwords from response
@@ -810,6 +1039,7 @@ def create_task():
     deadline = data.get('deadline')
     priority = data.get('priority')
     assigned_to = data.get('assigned_to') # Optional, can be assigned later
+    assigned_volunteers = data.get('assigned_volunteers', []) # Multiple volunteers
 
     if not all([title, description, deadline, priority]):
         return jsonify({"message": "Missing required task fields"}), 400
@@ -820,13 +1050,27 @@ def create_task():
         if not user or user['role'] not in ['volunteer', 'coordinator']:
             assigned_to = None
 
+    # Validate assigned_volunteers if provided
+    if assigned_volunteers:
+        valid_volunteers = []
+        for volunteer_id in assigned_volunteers:
+            user = db_service.get_user(volunteer_id)
+            if user and user['role'] == 'volunteer':
+                valid_volunteers.append(volunteer_id)
+        assigned_volunteers = valid_volunteers
+
+    # Set assigned_to to first volunteer for backward compatibility
+    if assigned_volunteers and not assigned_to:
+        assigned_to = assigned_volunteers[0]
+
     task_data = {
         "title": title,
         "description": description,
         "deadline": deadline,
         "priority": priority,
         "status": "Pending",
-        "assigned_to": assigned_to
+        "assigned_to": assigned_to,
+        "assigned_volunteers": assigned_volunteers
     }
     new_task_id = db_service.create_task(task_data)
     return jsonify({"message": "Task created successfully", "task_id": new_task_id}), 201
@@ -861,17 +1105,6 @@ def get_all_tasks():
         all_tasks = db_service.get_all_tasks()
     return jsonify(all_tasks), 200
 
-@app.route('/tasks/<task_id>', methods=['PUT'])
-@role_required(['admin'])
-def admin_update_task(task_id):
-    task = db_service.get_task(task_id)
-    if not task:
-        return jsonify({"message": "Task not found"}), 404
-
-    data = request.get_json()
-    db_service.update_task(task_id, data) # Admin can update any field directly
-    task.update(data)
-    return jsonify({"message": "Task updated successfully", "task": task}), 200
 
 @app.route('/tasks/<task_id>', methods=['DELETE'])
 @role_required(['admin'])
@@ -1229,29 +1462,6 @@ def admin_dashboard_summary():
         "team": team
     })
 
-@app.route('/attendance/mark', methods=['POST'])
-@role_required(['coordinator', 'admin'])
-def mark_attendance_for_user():
-    data = request.get_json()
-    user_id = data.get('user_id')
-    task_id = data.get('task_id')
-    date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
-
-    if not user_id or not task_id:
-        return jsonify({"message": "User ID and Task ID are required."}), 400
-    user = db_service.get_user(user_id)
-    if not user:
-        return jsonify({"message": "Invalid User ID."}), 400
-    task = db_service.get_task(task_id)
-    if not task:
-        return jsonify({"message": "Invalid Task ID."}), 400
-
-    # Prevent duplicate attendance for same user, task, date
-    if db_service.check_attendance_exists(user_id, task_id, date):
-        return jsonify({"message": "Attendance already submitted for this user, task, and date."}), 409
-
-    new_log_id = db_service.create_attendance_log({"log_id": f"att{uuid.uuid4().hex[:8]}", "user_id": user_id, "task_id": task_id, "date": date})
-    return jsonify({"message": "Attendance marked successfully", "log_id": new_log_id}), 201
 
 # --- FILTER ENDPOINTS FOR UI ---
 
@@ -1261,8 +1471,102 @@ def filter_attendance():
     user_id = request.args.get('user_id')
     task_id = request.args.get('task_id')
     date = request.args.get('date')
-    filtered = db_service.get_attendance_logs(user_id=user_id, task_id=task_id, date=date)
+    event_id = request.args.get('event_id')
+    filtered = db_service.get_attendance_logs(user_id=user_id, task_id=task_id, date=date, event_id=event_id)
     return jsonify(filtered), 200
+
+@app.route('/attendance/filter/simple', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def simple_attendance_filter():
+    """Simple attendance filter for event and status"""
+    try:
+        event_id = request.args.get('event_id')
+        user_id = request.args.get('user_id')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        status = request.args.get('status')
+        
+        print(f"Filter request: event_id={event_id}, user_id={user_id}, status={status}")
+        
+        # For user-based filtering, we need user_id
+        if not user_id and not event_id:
+            return jsonify({"message": "Either user_id or event_id is required"}), 400
+        
+        # Get attendance logs
+        if start_date and end_date:
+            attendance_logs = db_service.get_attendance_by_date_range(start_date, end_date, event_id) or []
+            # Filter by user_id if provided
+            if user_id:
+                attendance_logs = [log for log in attendance_logs if log.get('user_id') == user_id]
+        else:
+            attendance_logs = db_service.get_attendance_logs(event_id=event_id, user_id=user_id) or []
+        
+        # Get absentee logs (simplified for now)
+        absentee_logs = db_service.get_absentee_logs(event_id=event_id, user_id=user_id) or []
+        
+        print(f"Found {len(attendance_logs)} attendance logs and {len(absentee_logs)} absentee logs")
+        
+        # Get all users for name lookup
+        if user_id:
+            # Get specific user
+            user = db_service.get_user(user_id)
+            users = [user] if user else []
+        else:
+            # Get all volunteers and coordinators
+            volunteer_users = db_service.get_users_by_role('volunteer') or []
+            coordinator_users = db_service.get_users_by_role('coordinator') or []
+            users = volunteer_users + coordinator_users
+        
+        # Create user lookup
+        user_lookup = {user['user_id']: user['name'] for user in users if user}
+        
+        # Process results
+        results = []
+        
+        # Add present records
+        for log in attendance_logs:
+            user_id = log.get('user_id')
+            if user_id in user_lookup:
+                results.append({
+                    'user_id': user_id,
+                    'name': user_lookup[user_id],
+                    'event_id': log.get('event_id'),
+                    'task_id': log.get('task_id'),
+                    'date': log.get('date'),
+                    'status': 'present',
+                    'remark': log.get('remark', ''),
+                    'created_at': log.get('created_at'),
+                    'submission_time': log.get('created_at'),
+                    'marked_by': log.get('marked_by')
+                })
+        
+        # Add absent records
+        for log in absentee_logs:
+            user_id = log.get('user_id')
+            if user_id in user_lookup:
+                results.append({
+                    'user_id': user_id,
+                    'name': user_lookup[user_id],
+                    'event_id': log.get('event_id'),
+                    'task_id': log.get('task_id'),
+                    'date': log.get('date'),
+                    'status': 'absent',
+                    'remark': log.get('remark', ''),
+                    'created_at': log.get('created_at'),
+                    'submission_time': log.get('created_at'),
+                    'marked_by': log.get('marked_by')
+                })
+        
+        # Filter by status if provided
+        if status:
+            results = [r for r in results if r['status'] == status]
+        
+        print(f"Returning {len(results)} filtered results")
+        return jsonify(results), 200
+        
+    except Exception as e:
+        print(f"Filter error: {str(e)}")
+        return jsonify({"message": f"Filter error: {str(e)}"}), 500
 
 @app.route('/expenses/filter', methods=['GET'])
 @role_required(['admin', 'coordinator'])
@@ -1345,5 +1649,621 @@ def filter_volunteers():
         })
     return jsonify(filtered), 200
 
+# --- ENHANCED ATTENDANCE MANAGEMENT ENDPOINTS ---
+
+# Event Management
+@app.route('/events', methods=['GET'])
+@role_required(['admin', 'coordinator', 'volunteer'])
+def get_events():
+    """Get all events"""
+    try:
+        print("DEBUG: Getting events...")
+        events = db_service.get_all_events()
+        print(f"DEBUG: Found {len(events)} events")
+        return jsonify(events), 200
+    except Exception as e:
+        print(f"DEBUG: Error in get_events: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/events', methods=['POST'])
+@role_required(['admin', 'coordinator'])
+def create_event():
+    """Create a new event"""
+    data = request.get_json()
+    title = data.get('title')
+    description = data.get('description')
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+    location = data.get('location', '')
+    
+    if not all([title, description, start_date, end_date]):
+        return jsonify({"message": "Missing required event fields"}), 400
+    
+    event_data = {
+        "title": title,
+        "description": description,
+        "start_date": start_date,
+        "end_date": end_date,
+        "location": location,
+        "created_by": session['user_id']
+    }
+    
+    event_id = db_service.create_event(event_data)
+    return jsonify({"message": "Event created successfully", "event_id": event_id}), 201
+
+@app.route('/events/<event_id>', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def get_event(event_id):
+    """Get specific event"""
+    event = db_service.get_event(event_id)
+    if event:
+        return jsonify(event), 200
+    return jsonify({"message": "Event not found"}), 404
+
+# Group Management
+@app.route('/groups', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def get_groups():
+    """Get all groups"""
+    groups = db_service.get_all_groups()
+    return jsonify(groups), 200
+
+@app.route('/groups', methods=['POST'])
+@role_required(['admin', 'coordinator'])
+def create_group():
+    """Create a new group"""
+    data = request.get_json()
+    name = data.get('name')
+    description = data.get('description', '')
+    
+    if not name:
+        return jsonify({"message": "Group name is required"}), 400
+    
+    group_data = {
+        "name": name,
+        "description": description,
+        "created_by": session['user_id']
+    }
+    
+    group_id = db_service.create_group(group_data)
+    return jsonify({"message": "Group created successfully", "group_id": group_id}), 201
+
+# Enhanced Attendance Management
+@app.route('/attendance/test', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def test_attendance_system():
+    """Test endpoint to verify attendance system is working"""
+    try:
+        # Test database connection
+        users = db_service.get_users_by_role('volunteer')
+        tasks = db_service.get_all_tasks()
+        
+        return jsonify({
+            "status": "working",
+            "volunteers_count": len(users),
+            "tasks_count": len(tasks),
+            "message": "Attendance system is operational"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "message": f"Attendance system error: {str(e)}"
+        }), 500
+
+@app.route('/attendance/users', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def get_users_for_attendance():
+    """Get users for bulk attendance marking"""
+    try:
+        role_filter = request.args.get('role', 'volunteer')
+        event_id = request.args.get('event_id')
+        
+        if role_filter not in ['volunteer', 'coordinator', 'all']:
+            return jsonify({"message": "Invalid role filter"}), 400
+        
+        if role_filter == 'all':
+            users = db_service.get_all_users()
+        else:
+            users = db_service.get_users_by_role(role_filter)
+        
+        # Filter out admin users for attendance
+        users = [user for user in users if user.get('role') != 'admin']
+        
+        # Format for frontend
+        formatted_users = []
+        for user in users:
+            formatted_users.append({
+                "user_id": user['user_id'],
+                "name": user['name'],
+                "email": user['email'],
+                "role": user['role'],
+                "contact": user.get('contact', '')
+            })
+        
+        return jsonify({
+            "users": formatted_users,
+            "total": len(formatted_users)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"message": f"Error fetching users: {str(e)}"}), 500
+
+@app.route('/attendance/bulk', methods=['POST'])
+@role_required(['admin', 'coordinator'])
+def bulk_mark_attendance():
+    """Bulk mark attendance for multiple users"""
+    try:
+        data = request.get_json()
+        attendance_records = data.get('attendance_records', [])
+        event_id = data.get('event_id')  # Can be None for daily attendance
+        date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
+        remark = data.get('remark', '')  # Optional remark/task description
+        default_mode = data.get('default_mode', 'present')  # 'present' or 'absent'
+        
+        if not attendance_records:
+            return jsonify({"message": "No attendance records provided"}), 400
+        
+        if not date:
+            return jsonify({"message": "Date is required for bulk attendance marking"}), 400
+        
+        # Validate date format
+        try:
+            datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"message": "Invalid date format. Use YYYY-MM-DD"}), 400
+        
+        # Process attendance records
+        processed_records = []
+        absentee_records = []
+        invalid_records = []
+        
+        for i, record in enumerate(attendance_records):
+            user_id = record.get('user_id')
+            status = record.get('status', default_mode)
+            task_id = record.get('task_id', '')
+            
+            if not user_id:
+                invalid_records.append(f"Record {i+1}: Missing user_id")
+                continue
+            
+            # Validate user exists
+            user = db_service.get_user(user_id)
+            if not user:
+                invalid_records.append(f"Record {i+1}: Invalid user_id {user_id}")
+                continue
+            
+            # Validate task if provided
+            if task_id:
+                task = db_service.get_task(task_id)
+                if not task:
+                    invalid_records.append(f"Record {i+1}: Invalid task_id {task_id}")
+                    continue
+            
+            if status == 'present':
+                attendance_data = {
+                    "log_id": f"att{uuid.uuid4().hex[:8]}",
+                    "user_id": user_id,
+                    "task_id": task_id,
+                    "event_id": event_id,
+                    "date": date,
+                    "status": status,
+                    "remark": remark,
+                    "marked_by": session['user_id'],
+                    "created_at": datetime.now()
+                }
+                processed_records.append(attendance_data)
+            elif status == 'absent':
+                # Create absentee log instead
+                absentee_data = {
+                    "log_id": f"abs{uuid.uuid4().hex[:8]}",
+                    "user_id": user_id,
+                    "task_id": task_id,
+                    "event_id": event_id,
+                    "date": date,
+                    "remark": remark,
+                    "marked_by": session['user_id'],
+                    "created_at": datetime.now()
+                }
+                absentee_records.append(absentee_data)
+            else:
+                invalid_records.append(f"Record {i+1}: Invalid status '{status}'. Must be 'present' or 'absent'")
+        
+        # Process present records
+        created_ids = []
+        if processed_records:
+            created_ids = db_service.bulk_mark_attendance(processed_records)
+        
+        # Process absent records
+        absent_ids = []
+        for absentee_data in absentee_records:
+            absent_id = db_service.create_absentee_log(absentee_data)
+            if absent_id:
+                absent_ids.append(absent_id)
+        
+        total_processed = len(created_ids) + len(absent_ids)
+        
+        response_data = {
+            "message": f"Bulk attendance processed successfully. {len(created_ids)} present, {len(absent_ids)} absent records created.",
+            "created_ids": created_ids,
+            "absent_ids": absent_ids,
+            "total_processed": total_processed,
+            "total_records": len(attendance_records)
+        }
+        
+        if invalid_records:
+            response_data["invalid_records"] = invalid_records
+            response_data["message"] += f" {len(invalid_records)} records had errors."
+        
+        if total_processed > 0:
+            return jsonify(response_data), 201
+        else:
+            return jsonify({
+                "message": "No valid attendance records to process",
+                "invalid_records": invalid_records
+            }), 400
+            
+    except Exception as e:
+        return jsonify({"message": f"Error processing bulk attendance: {str(e)}"}), 500
+
+
+@app.route('/attendance/insights', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def get_attendance_insights():
+    """Get attendance insights and statistics"""
+    try:
+        event_id = request.args.get('event_id')
+        date = request.args.get('date', datetime.now().strftime("%Y-%m-%d"))
+        group_id = request.args.get('group_id')
+        
+        print(f"Getting attendance insights: event_id={event_id}, date={date}, group_id={group_id}")
+        
+        insights = db_service.get_attendance_insights(event_id=event_id, date=date, group_id=group_id)
+        
+        print(f"Insights data: {insights}")
+        
+        return jsonify(insights), 200
+    except Exception as e:
+        print(f"Error getting attendance insights: {str(e)}")
+        return jsonify({"message": f"Error getting insights: {str(e)}"}), 500
+
+@app.route('/attendance/absentees', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def get_absentee_list():
+    """Get list of absentees"""
+    event_id = request.args.get('event_id')
+    date = request.args.get('date', datetime.now().strftime("%Y-%m-%d"))
+    group_id = request.args.get('group_id')
+    
+    absentees = db_service.get_absentee_list(event_id=event_id, date=date, group_id=group_id)
+    return jsonify(absentees), 200
+
+@app.route('/attendance/date-range', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def get_attendance_by_date_range():
+    """Get attendance records within a date range"""
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    event_id = request.args.get('event_id')
+    
+    if not start_date or not end_date:
+        return jsonify({"message": "Start date and end date are required"}), 400
+    
+    attendance_records = db_service.get_attendance_by_date_range(start_date, end_date, event_id)
+    return jsonify(attendance_records), 200
+
+@app.route('/attendance/sessions', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def get_attendance_sessions():
+    """Get attendance sessions"""
+    event_id = request.args.get('event_id')
+    date = request.args.get('date')
+    
+    sessions = db_service.get_attendance_sessions(event_id=event_id, date=date)
+    return jsonify(sessions), 200
+
+@app.route('/attendance/sessions', methods=['POST'])
+@role_required(['admin', 'coordinator'])
+def create_attendance_session():
+    """Create an attendance session for bulk marking"""
+    data = request.get_json()
+    event_id = data.get('event_id')
+    date = data.get('date', datetime.now().strftime("%Y-%m-%d"))
+    title = data.get('title', f"Attendance Session - {date}")
+    description = data.get('description', '')
+    
+    if not event_id:
+        return jsonify({"message": "Event ID is required"}), 400
+    
+    session_data = {
+        "event_id": event_id,
+        "date": date,
+        "title": title,
+        "description": description,
+        "created_by": session['user_id'],
+        "status": "active"
+    }
+    
+    session_id = db_service.create_attendance_session(session_data)
+    return jsonify({
+        "message": "Attendance session created successfully",
+        "session_id": session_id
+    }), 201
+
+# Enhanced filtering endpoints
+@app.route('/attendance/filter/advanced', methods=['GET'])
+@role_required(['admin', 'coordinator'])
+def advanced_attendance_filter():
+    """Advanced attendance filtering with multiple criteria"""
+    try:
+        event_id = request.args.get('event_id')
+        group_id = request.args.get('group_id')
+        user_id = request.args.get('user_id')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        status = request.args.get('status')  # 'present', 'absent', 'unmarked'
+        user_name = request.args.get('user_name')
+        
+        # Get base data
+        if group_id:
+            users = db_service.get_users_by_group(group_id) or []
+        elif user_id:
+            # Filter by specific user
+            volunteer_users = db_service.get_users_by_role('volunteer') or []
+            coordinator_users = db_service.get_users_by_role('coordinator') or []
+            all_users = volunteer_users + coordinator_users
+            users = [u for u in all_users if u['user_id'] == user_id]
+        else:
+            # Get all non-admin users for filtering
+            volunteer_users = db_service.get_users_by_role('volunteer') or []
+            coordinator_users = db_service.get_users_by_role('coordinator') or []
+            users = volunteer_users + coordinator_users
+        
+        # Filter by user name if provided
+        if user_name:
+            users = [u for u in users if user_name.lower() in u['name'].lower()]
+        
+        # Get attendance data
+        if start_date and end_date:
+            attendance_logs = db_service.get_attendance_by_date_range(start_date, end_date, event_id) or []
+        else:
+            attendance_logs = db_service.get_attendance_logs(event_id=event_id) or []
+        
+        # Get absentee data
+        if start_date and end_date:
+            absentee_logs = []
+            # Would need to implement date range filtering for absentees
+        else:
+            absentee_logs = db_service.get_absentee_logs(event_id=event_id) or []
+        
+        # Process results
+        results = []
+        for user in users:
+            user_id = user['user_id']
+            user_attendance = [log for log in attendance_logs if log['user_id'] == user_id]
+            user_absent = [log for log in absentee_logs if log['user_id'] == user_id]
+            
+            if status == 'present' and not user_attendance:
+                continue
+            elif status == 'absent' and not user_absent:
+                continue
+            elif status == 'unmarked' and (user_attendance or user_absent):
+                continue
+            
+            # Get the most recent date and submission time for this user
+            latest_date = None
+            submission_time = None
+            if user_attendance:
+                latest_log = max(user_attendance, key=lambda x: x.get('date', ''))
+                latest_date = latest_log.get('date', '')
+                created_at = latest_log.get('created_at')
+                if created_at:
+                    if isinstance(created_at, str):
+                        submission_time = created_at
+                    else:
+                        submission_time = created_at.strftime("%Y-%m-%d %H:%M:%S")
+            elif user_absent:
+                latest_log = max(user_absent, key=lambda x: x.get('date', ''))
+                latest_date = latest_log.get('date', '')
+                created_at = latest_log.get('created_at')
+                if created_at:
+                    if isinstance(created_at, str):
+                        submission_time = created_at
+                    else:
+                        submission_time = created_at.strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Get remark from the latest record
+            latest_remark = None
+            if user_attendance:
+                latest_remark = latest_log.get('remark', '')
+            elif user_absent:
+                latest_remark = latest_log.get('remark', '')
+            
+            results.append({
+                'user_id': user_id,
+                'name': user['name'],
+                'email': user['email'],
+                'attendance_count': len(user_attendance),
+                'absent_count': len(user_absent),
+                'status': 'present' if user_attendance else ('absent' if user_absent else 'unmarked'),
+                'date': latest_date,
+                'submission_time': submission_time,
+                'remark': latest_remark
+            })
+        
+        print(f"Filter results: {len(results)} records found")
+        return jsonify(results), 200
+        
+    except Exception as e:
+        print(f"Error in advanced_attendance_filter: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+# --- ANNOUNCEMENT MANAGEMENT ENDPOINTS ---
+
+@app.route('/announcements', methods=['GET'])
+@role_required(['coordinator', 'admin', 'volunteer'])
+def get_announcements():
+    """Get all announcements"""
+    try:
+        print("DEBUG: Getting announcements...")
+        event_id = request.args.get('event_id')
+        creator_id = request.args.get('creator_id')
+        
+        if event_id:
+            announcements = db_service.get_announcements_by_event(event_id)
+        elif creator_id:
+            announcements = db_service.get_announcements_by_creator(creator_id)
+        else:
+            announcements = db_service.get_all_announcements()
+        
+        print(f"DEBUG: Found {len(announcements)} announcements")
+        
+        # Sort by creation date (newest first)
+        announcements.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        
+        return jsonify(announcements), 200
+    except Exception as e:
+        print(f"DEBUG: Error in get_announcements: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/announcements', methods=['POST'])
+@role_required(['coordinator', 'admin'])
+def create_announcement():
+    """Create a new announcement"""
+    data = request.get_json()
+    title = data.get('title')
+    content = data.get('content')
+    event_id = data.get('event_id')
+    priority = data.get('priority', 'normal')  # low, normal, high, urgent
+    target_audience = data.get('target_audience', 'all')  # all, volunteers, coordinators, specific
+    selected_users = data.get('selected_users')  # List of user IDs for specific audience
+    
+    if not all([title, content]):
+        return jsonify({"message": "Title and content are required"}), 400
+    
+    # Validate event_id if provided
+    if event_id:
+        event = db_service.get_event(event_id)
+        if not event:
+            return jsonify({"message": "Invalid event ID"}), 400
+    
+    # Validate priority
+    if priority not in ['low', 'normal', 'high', 'urgent']:
+        priority = 'normal'
+    
+    # Validate target audience
+    if target_audience not in ['all', 'volunteers', 'coordinators', 'specific']:
+        target_audience = 'all'
+    
+    # Validate selected users if specific audience
+    if target_audience == 'specific':
+        if not selected_users or len(selected_users) == 0:
+            return jsonify({"message": "Please select at least one user for specific audience"}), 400
+        
+        # Validate that all selected users exist
+        for user_id in selected_users:
+            user = db_service.get_user(user_id)
+            if not user:
+                return jsonify({"message": f"User {user_id} not found"}), 400
+    
+    announcement_data = {
+        "title": title,
+        "content": content,
+        "event_id": event_id,
+        "priority": priority,
+        "target_audience": target_audience,
+        "selected_users": selected_users if target_audience == 'specific' else None,
+        "created_by": session['user_id'],
+        "status": "active"  # active, archived
+    }
+    
+    announcement_id = db_service.create_announcement(announcement_data)
+    return jsonify({
+        "message": "Announcement created successfully", 
+        "announcement_id": announcement_id
+    }), 201
+
+@app.route('/announcements/<announcement_id>', methods=['GET'])
+@role_required(['coordinator', 'admin'])
+def get_announcement(announcement_id):
+    """Get specific announcement"""
+    announcement = db_service.get_announcement(announcement_id)
+    if announcement:
+        return jsonify(announcement), 200
+    return jsonify({"message": "Announcement not found"}), 404
+
+@app.route('/announcements/<announcement_id>', methods=['PUT'])
+@role_required(['coordinator', 'admin'])
+def update_announcement(announcement_id):
+    """Update announcement"""
+    announcement = db_service.get_announcement(announcement_id)
+    if not announcement:
+        return jsonify({"message": "Announcement not found"}), 404
+    
+    # Check if user can edit this announcement
+    if session['role'] == 'coordinator' and announcement.get('created_by') != session['user_id']:
+        return jsonify({"message": "Forbidden: Cannot edit announcements not created by you"}), 403
+    
+    data = request.get_json()
+    update_data = {}
+    
+    if 'title' in data:
+        update_data['title'] = data['title']
+    if 'content' in data:
+        update_data['content'] = data['content']
+    if 'priority' in data:
+        if data['priority'] in ['low', 'normal', 'high', 'urgent']:
+            update_data['priority'] = data['priority']
+    if 'target_audience' in data:
+        if data['target_audience'] in ['all', 'volunteers', 'coordinators', 'specific_group']:
+            update_data['target_audience'] = data['target_audience']
+    if 'status' in data:
+        if data['status'] in ['active', 'archived']:
+            update_data['status'] = data['status']
+    
+    if update_data:
+        db_service.update_announcement(announcement_id, update_data)
+        announcement.update(update_data)
+        return jsonify({
+            "message": "Announcement updated successfully", 
+            "announcement": announcement
+        }), 200
+    
+    return jsonify({"message": "No valid fields to update"}), 400
+
+@app.route('/announcements/<announcement_id>', methods=['DELETE'])
+@role_required(['coordinator', 'admin'])
+def delete_announcement(announcement_id):
+    """Delete announcement"""
+    announcement = db_service.get_announcement(announcement_id)
+    if not announcement:
+        return jsonify({"message": "Announcement not found"}), 404
+    
+    # Check if user can delete this announcement
+    if session['role'] == 'coordinator' and announcement.get('created_by') != session['user_id']:
+        return jsonify({"message": "Forbidden: Cannot delete announcements not created by you"}), 403
+    
+    db_service.delete_announcement(announcement_id)
+    return jsonify({"message": "Announcement deleted successfully"}), 200
+
+@app.route('/announcements/event/<event_id>', methods=['GET'])
+@role_required(['coordinator', 'admin'])
+def get_event_announcements(event_id):
+    """Get announcements for a specific event"""
+    event = db_service.get_event(event_id)
+    if not event:
+        return jsonify({"message": "Event not found"}), 404
+    
+    announcements = db_service.get_announcements_by_event(event_id)
+    announcements.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+    
+    return jsonify(announcements), 200
+
 if __name__ == '__main__':
+    # For local development
     app.run(debug=True, port=5000)

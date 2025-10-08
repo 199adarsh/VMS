@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 Volunteer One	
 volunteer1@example.com	
 password123	
