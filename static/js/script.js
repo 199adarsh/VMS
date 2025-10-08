@@ -2275,12 +2275,14 @@ function updateDashboardNotifications() {
     { msg: "Expense report submitted.", time: "1h ago" },
   ];
   const notifList = document.getElementById("dashboard-notifications-list");
-  notifList.innerHTML = "";
-  notifications.forEach((n) => {
-    const li = document.createElement("li");
-    li.innerHTML = `<span class='font-semibold text-gray-700'>${n.msg}</span> <span class='text-xs text-gray-400 ml-2'>${n.time}</span>`;
-    notifList.appendChild(li);
-  });
+  if (notifList) {
+    notifList.innerHTML = "";
+    notifications.forEach((n) => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class='font-semibold text-gray-700'>${n.msg}</span> <span class='text-xs text-gray-400 ml-2'>${n.time}</span>`;
+      notifList.appendChild(li);
+    });
+  }
 }
 function updateDashboardActivity() {
   const activity = [
@@ -2306,20 +2308,26 @@ function setupDashboardQuickActions() {
     };
   const addTaskBtn = document.getElementById("dashboard-add-task-btn");
   if (addTaskBtn) addTaskBtn.onclick = () => showTab("admin-tasks");
-  
-  const markAttendanceBtn = document.getElementById("dashboard-mark-attendance-btn");
-  if (markAttendanceBtn) markAttendanceBtn.onclick = () => showTab("admin-attendance");
+
+  const markAttendanceBtn = document.getElementById(
+    "dashboard-mark-attendance-btn"
+  );
+  if (markAttendanceBtn)
+    markAttendanceBtn.onclick = () => showTab("admin-attendance");
   const addRatingBtn = document.getElementById("dashboard-add-rating-btn");
   if (addRatingBtn) addRatingBtn.onclick = () => showTab("admin-ratings");
-  
+
   const addExpenseBtn = document.getElementById("dashboard-add-expense-btn");
   if (addExpenseBtn) addExpenseBtn.onclick = () => showTab("admin-expenses");
-  
+
   const viewReportsBtn = document.getElementById("dashboard-view-reports-btn");
   if (viewReportsBtn) viewReportsBtn.onclick = () => showTab("admin-reports");
-  
-  const viewVolunteersBtn = document.getElementById("dashboard-view-volunteers-btn");
-  if (viewVolunteersBtn) viewVolunteersBtn.onclick = () => showTab("admin-users");
+
+  const viewVolunteersBtn = document.getElementById(
+    "dashboard-view-volunteers-btn"
+  );
+  if (viewVolunteersBtn)
+    viewVolunteersBtn.onclick = () => showTab("admin-users");
 }
 
 // Unified search (dashboard only)

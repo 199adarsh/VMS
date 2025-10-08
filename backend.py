@@ -390,6 +390,101 @@ def test_endpoint():
         'timestamp': datetime.now().isoformat()
     }), 200
 
+@app.route('/test-firebase-auth', methods=['GET'])
+def test_firebase_auth():
+    """Test Firebase Auth service"""
+    try:
+        # Test if Firebase Admin is initialized
+        firebase_initialized = len(firebase_admin._apps) > 0
+        
+        # Test database connection
+        db_connected = db_service.db is not None
+        
+        # Test if we can create a test user
+        test_user_data = {
+            "email": "test@example.com",
+            "password": "test123",
+            "name": "Test User",
+            "role": "volunteer",
+            "contact": "1234567890"
+        }
+        
+        # Try to create a test user
+        test_user_id = db_service.create_user(test_user_data)
+        
+        return jsonify({
+            'firebase_initialized': firebase_initialized,
+            'db_connected': db_connected,
+            'test_user_created': test_user_id is not None,
+            'test_user_id': test_user_id,
+            'message': 'Firebase Auth test completed'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'message': 'Firebase Auth test failed'
+        }), 500
+
+@app.route('/init-test-users', methods=['POST'])
+def init_test_users():
+    """Initialize test users from Users.txt data"""
+    try:
+        # Test users data from Users.txt
+        test_users = [
+            {
+                "name": "Volunteer One",
+                "email": "volunteer1@example.com",
+                "password": "password123",
+                "role": "volunteer",
+                "contact": "1234567890"
+            },
+            {
+                "name": "Coordinator One", 
+                "email": "coordinator1@example.com",
+                "password": "password123",
+                "role": "coordinator",
+                "contact": "1234567891"
+            },
+            {
+                "name": "Admin One",
+                "email": "admin1@example.com", 
+                "password": "password123",
+                "role": "admin",
+                "contact": "1234567892"
+            }
+        ]
+        
+        created_users = []
+        for user_data in test_users:
+            # Check if user already exists
+            existing_user = db_service.get_user_by_email(user_data['email'])
+            if not existing_user:
+                user_id = db_service.create_user(user_data)
+                created_users.append({
+                    'user_id': user_id,
+                    'email': user_data['email'],
+                    'role': user_data['role']
+                })
+            else:
+                created_users.append({
+                    'user_id': existing_user['user_id'],
+                    'email': user_data['email'],
+                    'role': user_data['role'],
+                    'status': 'already_exists'
+                })
+        
+        return jsonify({
+            'message': 'Test users initialized successfully',
+            'users': created_users,
+            'total_users': len(created_users)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'message': 'Failed to initialize test users'
+        }), 500
+
 @app.route('/test-firebase', methods=['GET'])
 def test_firebase():
     """Test Firebase Admin SDK initialization"""
