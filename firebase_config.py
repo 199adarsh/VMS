@@ -61,11 +61,16 @@ class FirebaseConfig:
                 required_fields = ['project_id', 'private_key', 'client_email']
                 missing_fields = [field for field in required_fields if not cred_dict.get(field)]
                 if missing_fields:
+                    print(f"ERROR: Missing required Firebase environment variables: {missing_fields}")
                     raise ValueError(f"Missing required Firebase environment variables: {missing_fields}")
+                
+                print(f"DEBUG: All required fields present. Project ID: {cred_dict['project_id']}")
+                print(f"DEBUG: Client email: {cred_dict['client_email']}")
+                print(f"DEBUG: Private key starts with: {cred_dict['private_key'][:50]}...")
                 
                 cred = credentials.Certificate(cred_dict)
                 firebase_admin.initialize_app(cred)
-                print("Firebase initialized with environment variables")
+                print("SUCCESS: Firebase initialized with environment variables")
             else:
                 print("Using default credentials for Firebase initialization")
                 # Use default credentials (for development with Firebase emulator or GCP)
