@@ -4,14 +4,23 @@ console.log("API_BASE_URL:", API_BASE_URL);
 
 // --- DOM Elements ---
 const loginSection = document.getElementById("login-section");
+const registerSection = document.getElementById("register-section");
 const dashboardSection = document.getElementById("dashboard-section");
 const loginForm = document.getElementById("login-form");
+const registerForm = document.getElementById("register-form");
 const loginMessage = document.getElementById("login-message");
+const registerMessage = document.getElementById("register-message");
 const userNameSpan = document.getElementById("user-name");
 const userRoleSpan = document.getElementById("user-role");
 const logoutButton = document.getElementById("logout-button");
 const dashboardTabs = document.getElementById("dashboard-tabs");
 const tabContents = document.querySelectorAll(".tab-content");
+
+// Google Auth Elements
+const googleLoginBtn = document.getElementById("google-login-btn");
+const googleRegisterBtn = document.getElementById("google-register-btn");
+const showRegisterBtn = document.getElementById("show-register-btn");
+const showLoginBtn = document.getElementById("show-login-btn");
 
 // Volunteer Specific Elements
 const assignedTasksList = document.getElementById("assigned-tasks-list");
