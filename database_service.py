@@ -58,7 +58,12 @@ class DatabaseService:
             }
         ]
         
-        self.fallback_storage['users'] = {user['email']: user for user in test_users}
+        # Store users by both email and user_id for easy lookup
+        self.fallback_storage['users'] = {}
+        for user in test_users:
+            self.fallback_storage['users'][user['email']] = user
+            self.fallback_storage['users'][user['user_id']] = user
+        
         print(f"Initialized {len(test_users)} fallback users")
     
     def _get_collection_ref(self, collection_name: str):
@@ -84,7 +89,8 @@ class DatabaseService:
     def get_user(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user by ID"""
         if not self.db:
-            return None
+            # Use fallback storage - direct lookup by user_id
+            return self.fallback_storage.get('users', {}).get(user_id)
         
         doc_ref = self._get_collection_ref('users').document(user_id)
         doc = doc_ref.get()
@@ -117,7 +123,9 @@ class DatabaseService:
     def get_users_by_role(self, role: str) -> List[Dict[str, Any]]:
         """Get users by role"""
         if not self.db:
-            return []
+            # Use fallback storage - filter by role
+            users = self.fallback_storage.get('users', {})
+            return [user for user in users.values() if user.get('role') == role]
         
         users_ref = self._get_collection_ref('users')
         query = users_ref.where('role', '==', role)
