@@ -22,6 +22,21 @@ const googleRegisterBtn = document.getElementById("google-register-btn");
 const showRegisterBtn = document.getElementById("show-register-btn");
 const showLoginBtn = document.getElementById("show-login-btn");
 
+// Event Listeners for login/register toggle
+if (showRegisterBtn) {
+  showRegisterBtn.addEventListener("click", () => {
+    if (loginSection) loginSection.classList.add("hidden");
+    if (registerSection) registerSection.classList.remove("hidden");
+  });
+}
+
+if (showLoginBtn) {
+  showLoginBtn.addEventListener("click", () => {
+    if (registerSection) registerSection.classList.add("hidden");
+    if (loginSection) loginSection.classList.remove("hidden");
+  });
+}
+
 // Volunteer Specific Elements
 const assignedTasksList = document.getElementById("assigned-tasks-list");
 const myAttendanceHistory = document.getElementById("my-attendance-history");
@@ -752,46 +767,26 @@ async function populateCoordinatorTaskSelects() {
   }
 }
 
-assignTaskForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const taskId = assignTaskIdSelect.value;
-  const volunteerId = assignVolunteerIdSelect.value;
-  const priority = assignPrioritySelect.value;
-  const deadline = assignDeadlineInput.value;
+// Duplicate event listeners removed - already handled above with null checks
 
-  try {
-    const result = await apiRequest("/tasks/assign_volunteer", "POST", {
-      task_id: taskId,
-      volunteer_id: volunteerId,
-      priority,
-      deadline,
-    });
-    showMessage(assignTaskMessage, result.message, "success");
-    assignTaskForm.reset();
-    populateCoordinatorTaskSelects(); // Refresh tasks
-  } catch (error) {
-    showMessage(assignTaskMessage, error.message, "error");
-  }
-});
+// reassignTaskForm.addEventListener("submit", async (e) => {
+//   e.preventDefault();
+//   const taskId = reassignTaskSelect.value;
+//   const newVolunteerId = reassignVolunteerIdSelect.value;
 
-reassignTaskForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const taskId = reassignTaskSelect.value;
-  const newVolunteerId = reassignVolunteerIdSelect.value;
-
-  try {
-    const result = await apiRequest(
-      `/tasks/reassign_volunteer/${taskId}`,
-      "PUT",
-      { volunteer_id: newVolunteerId }
-    );
-    showMessage(reassignTaskMessage, result.message, "success");
-    reassignTaskForm.reset();
-    populateCoordinatorTaskSelects(); // Refresh tasks
-  } catch (error) {
-    showMessage(reassignTaskMessage, error.message, "error");
-  }
-});
+//   try {
+//     const result = await apiRequest(
+//       `/tasks/reassign_volunteer/${taskId}`,
+//       "PUT",
+//       { volunteer_id: newVolunteerId }
+//     );
+//     showMessage(reassignTaskMessage, result.message, "success");
+//     reassignTaskForm.reset();
+//     populateCoordinatorTaskSelects(); // Refresh tasks
+//   } catch (error) {
+//     showMessage(reassignTaskMessage, error.message, "error");
+//   }
+// });
 
 async function fetchCoordinatorAttendance() {
   try {

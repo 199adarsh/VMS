@@ -1216,16 +1216,16 @@
       // Google Auth Provider
       const googleProvider = new firebase.auth.GoogleAuthProvider();
 
-      // Event Listeners
-      showRegisterBtn.addEventListener("click", () => {
-        loginSection.classList.add("hidden");
-        registerSection.classList.remove("hidden");
-      });
+      // Event Listeners (moved to script.js)
+      // showRegisterBtn.addEventListener("click", () => {
+      //   loginSection.classList.add("hidden");
+      //   registerSection.classList.remove("hidden");
+      // });
 
-      showLoginBtn.addEventListener("click", () => {
-        registerSection.classList.add("hidden");
-        loginSection.classList.remove("hidden");
-      });
+      // showLoginBtn.addEventListener("click", () => {
+      //   registerSection.classList.add("hidden");
+      //   loginSection.classList.remove("hidden");
+      // });
 
       // Login Form
       loginForm.addEventListener("submit", async (e) => {
