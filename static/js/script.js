@@ -1512,7 +1512,9 @@ if (createTaskForm) {
 
 async function fetchAllTasks() {
   try {
-    const statusFilter = adminTaskStatusFilter.value;
+    const statusFilter = adminTaskStatusFilter
+      ? adminTaskStatusFilter.value
+      : "";
     const queryParams = new URLSearchParams();
     if (statusFilter) queryParams.append("status", statusFilter);
 
@@ -1595,7 +1597,7 @@ if (adminTaskFilterBtn) {
 }
 if (adminTaskResetBtn) {
   adminTaskResetBtn.addEventListener("click", () => {
-    adminTaskStatusFilter.value = "";
+    if (adminTaskStatusFilter) adminTaskStatusFilter.value = "";
     fetchAllTasks();
   });
 }
