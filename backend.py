@@ -7,6 +7,7 @@ from datetime import datetime
 from database_service import db_service
 from firebase_auth_service import firebase_auth_service
 from firebase_config import firebase_config
+from ai_service import ai_service
 import jwt
 import firebase_admin
 
@@ -15,8 +16,6 @@ CORS(app, origins=["*"], supports_credentials=True)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your_super_secret_key') # Use environment variable in production
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = False
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
 
 
 def login_required(f):
@@ -52,7 +51,6 @@ def role_required(allowed_roles):
     def decorator(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            print(f'DEBUG: role_required check. Session: {dict(session)}')
             if 'user_id' not in session:
                 print('DEBUG: No user_id in session')
                 return jsonify({"message": "Unauthorized: Login required"}), 401
@@ -97,19 +95,12 @@ def dashbords():
 
 @app.route('/login', methods=['POST'])
 def login():
-    try:
-        print("Login attempt received")
-        data = request.get_json()
-        print(f"Login data: {data}")
-        email = data.get('email')
-        password = data.get('password')
-        return_token = data.get('return_token', False)  # Option to return JWT token
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
+    return_token = data.get('return_token', False)  # Option to return JWT token
 
-        user = db_service.get_user_by_email(email)
-        print(f"User found: {user is not None}")
-    except Exception as e:
-        print(f"Login error: {e}")
-        return jsonify({"message": f"Login error: {str(e)}"}), 500
+    user = db_service.get_user_by_email(email)
     
     if user and user.get('password') == password:
         session['user_id'] = user['user_id']
@@ -380,123 +371,8 @@ def health_check():
         'status': 'healthy',
         'firebase_connected': db_service.db is not None,
         'environment': 'production' if os.getenv('FIREBASE_PROJECT_ID') else 'development',
-        'firebase_admin_initialized': len(firebase_admin._apps) > 0,
-        'message': 'API is working'
+        'firebase_admin_initialized': len(firebase_admin._apps) > 0
     }), 200
-
-@app.route('/test', methods=['GET'])
-def test_endpoint():
-    """Simple test endpoint to verify API is working"""
-    return jsonify({
-        'message': 'API is working!',
-        'status': 'success',
-        'timestamp': datetime.now().isoformat()
-    }), 200
-
-@app.route('/test-session', methods=['GET'])
-def test_session():
-    """Test session status"""
-    return jsonify({
-        'session_data': dict(session),
-        'user_id_in_session': 'user_id' in session,
-        'role_in_session': 'role' in session,
-        'session_keys': list(session.keys())
-    }), 200
-
-@app.route('/test-firebase-auth', methods=['GET'])
-def test_firebase_auth():
-    """Test Firebase Auth service"""
-    try:
-        # Test if Firebase Admin is initialized
-        firebase_initialized = len(firebase_admin._apps) > 0
-        
-        # Test database connection
-        db_connected = db_service.db is not None
-        
-        # Test if we can create a test user
-        test_user_data = {
-            "email": "test@example.com",
-            "password": "test123",
-            "name": "Test User",
-            "role": "volunteer",
-            "contact": "1234567890"
-        }
-        
-        # Try to create a test user
-        test_user_id = db_service.create_user(test_user_data)
-        
-        return jsonify({
-            'firebase_initialized': firebase_initialized,
-            'db_connected': db_connected,
-            'test_user_created': test_user_id is not None,
-            'test_user_id': test_user_id,
-            'message': 'Firebase Auth test completed'
-        }), 200
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'message': 'Firebase Auth test failed'
-        }), 500
-
-@app.route('/init-test-users', methods=['POST'])
-def init_test_users():
-    """Initialize test users from Users.txt data"""
-    try:
-        # Test users data from Users.txt
-        test_users = [
-            {
-                "name": "Volunteer One",
-                "email": "volunteer1@example.com",
-                "password": "password123",
-                "role": "volunteer",
-                "contact": "1234567890"
-            },
-            {
-                "name": "Coordinator One", 
-                "email": "coordinator1@example.com",
-                "password": "password123",
-                "role": "coordinator",
-                "contact": "1234567891"
-            },
-            {
-                "name": "Admin One",
-                "email": "admin1@example.com", 
-                "password": "password123",
-                "role": "admin",
-                "contact": "1234567892"
-            }
-        ]
-        
-        created_users = []
-        for user_data in test_users:
-            # Check if user already exists
-            existing_user = db_service.get_user_by_email(user_data['email'])
-            if not existing_user:
-                user_id = db_service.create_user(user_data)
-                created_users.append({
-                    'user_id': user_id,
-                    'email': user_data['email'],
-                    'role': user_data['role']
-                })
-            else:
-                created_users.append({
-                    'user_id': existing_user['user_id'],
-                    'email': user_data['email'],
-                    'role': user_data['role'],
-                    'status': 'already_exists'
-                })
-        
-        return jsonify({
-            'message': 'Test users initialized successfully',
-            'users': created_users,
-            'total_users': len(created_users)
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'message': 'Failed to initialize test users'
-        }), 500
 
 @app.route('/test-firebase', methods=['GET'])
 def test_firebase():
@@ -554,7 +430,10 @@ def volunteer_mark_task_completed(task_id):
     task = db_service.get_task(task_id)
     if not task:
         return jsonify({"message": "Task not found"}), 404
-    if task.get('assigned_to') != current_user_id:
+    
+    # Check if user is assigned to this task (either as single assignee or in multiple volunteers)
+    assigned_volunteers = task.get('assigned_volunteers', [])
+    if task.get('assigned_to') != current_user_id and current_user_id not in assigned_volunteers:
         return jsonify({"message": "Forbidden: Cannot update tasks not assigned to you"}), 403
 
     data = request.get_json()
@@ -574,7 +453,10 @@ def volunteer_update_task_completion(task_id):
     task = db_service.get_task(task_id)
     if not task:
         return jsonify({"message": "Task not found"}), 404
-    if task.get('assigned_to') != current_user_id:
+    
+    # Check if user is assigned to this task (either as single assignee or in multiple volunteers)
+    assigned_volunteers = task.get('assigned_volunteers', [])
+    if task.get('assigned_to') != current_user_id and current_user_id not in assigned_volunteers:
         return jsonify({"message": "Forbidden: Cannot update tasks not assigned to you"}), 403
 
     data = request.get_json()
@@ -1537,9 +1419,7 @@ def coordinator_dashboard_summary():
 @app.route('/dashboard/admin', methods=['GET'])
 @role_required(['admin'])
 def admin_dashboard_summary():
-    print(f"Admin dashboard called. Session: {dict(session)}")
     user = db_service.get_user(session['user_id'])
-    print(f"User data: {user}")
     # Attendance % (average of all volunteers)
     volunteers = db_service.get_users_by_role('volunteer')
     volunteer_ids = [v['user_id'] for v in volunteers]
@@ -2374,6 +2254,267 @@ def get_event_announcements(event_id):
     
     return jsonify(announcements), 200
 
+# --- AI-POWERED FEATURES ENDPOINTS ---
+
+@app.route('/ai/task-guide/<task_id>', methods=['GET'])
+@login_required
+def get_task_completion_guide(task_id):
+    """Get AI-generated task completion guide"""
+    try:
+        current_user_id = session['user_id']
+        current_user_role = session.get('role')
+        
+        # Get task details
+        task = db_service.get_task(task_id)
+        if not task:
+            return jsonify({"message": "Task not found"}), 404
+        
+        # Check if user has access to this task
+        if current_user_role == 'volunteer':
+            assigned_volunteers = task.get('assigned_volunteers', [])
+            if task.get('assigned_to') != current_user_id and current_user_id not in assigned_volunteers:
+                return jsonify({"message": "Task not assigned to you"}), 403
+        
+        # Generate AI completion guide
+        guide_result = ai_service.generate_task_completion_guide(task)
+        
+        if guide_result['success']:
+            return jsonify(guide_result), 200
+        else:
+            return jsonify(guide_result), 500
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error generating task guide: {str(e)}"
+        }), 500
+
+@app.route('/ai/chatbot', methods=['POST'])
+@login_required
+def chatbot_query():
+    """Handle chatbot queries"""
+    try:
+        current_user_id = session['user_id']
+        data = request.get_json()
+        user_message = data.get('message', '').strip()
+        
+        if not user_message:
+            return jsonify({"message": "Message is required"}), 400
+        
+        # Get user context
+        user = db_service.get_user(current_user_id)
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+        
+        # Get user's assigned tasks for context
+        assigned_tasks = db_service.get_tasks_by_assignee(current_user_id)
+        
+        context = {
+            'role': user.get('role'),
+            'assigned_tasks': assigned_tasks,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Generate AI response
+        response = ai_service.generate_chatbot_response(user_message, context)
+        
+        if response['success']:
+            return jsonify(response), 200
+        else:
+            return jsonify(response), 500
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error processing chatbot query: {str(e)}"
+        }), 500
+
+@app.route('/ai/recommendations', methods=['GET'])
+@login_required
+def get_volunteer_recommendations():
+    """Get AI-generated volunteer recommendations for coordinators"""
+    try:
+        current_user_id = session['user_id']
+        
+        # Get user data
+        user = db_service.get_user(current_user_id)
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+        
+        # Only allow coordinators and admins to access volunteer recommendations
+        if user.get('role') not in ['coordinator', 'admin']:
+            return jsonify({
+                "success": False,
+                "message": "Volunteer recommendations are only available to coordinators and administrators"
+            }), 403
+        
+        # Get available tasks for context
+        all_tasks = db_service.get_all_tasks()
+        
+        user_data = {
+            'user_id': current_user_id,
+            'role': user.get('role'),
+            'skills': user.get('skills', []),
+            'completed_tasks': []
+        }
+        
+        # Generate volunteer recommendations
+        recommendations = ai_service.generate_recommendations(user_data, all_tasks, [])
+        
+        if recommendations['success']:
+            return jsonify(recommendations), 200
+        else:
+            return jsonify(recommendations), 500
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error generating volunteer recommendations: {str(e)}"
+        }), 500
+
+@app.route('/ai/task-recommendations', methods=['POST'])
+@login_required
+def get_task_volunteer_recommendations():
+    """Get AI recommendations for which volunteers should be assigned to a task"""
+    try:
+        current_user_id = session['user_id']
+        task_data = request.get_json()
+        
+        # Get all volunteers
+        volunteers = db_service.get_all_users()
+        volunteer_list = [user for user in volunteers if user.get('role') == 'volunteer']
+        
+        # Get task details
+        task_title = task_data.get('title', '')
+        task_description = task_data.get('description', '')
+        task_priority = task_data.get('priority', 'Medium')
+        
+        # Create volunteer data for AI analysis
+        volunteer_data = []
+        for vol in volunteer_list:
+            # Get volunteer's completed tasks
+            completed_tasks = db_service.get_tasks_by_assignee(vol['user_id'])
+            completed_tasks = [task for task in completed_tasks if task.get('status') == 'Completed']
+            
+            volunteer_info = {
+                'user_id': vol['user_id'],
+                'name': vol['name'],
+                'role': vol['role'],
+                'skills': vol.get('skills', []),
+                'completed_tasks': completed_tasks,
+                'experience_level': 'expert' if len(completed_tasks) > 10 else 'intermediate' if len(completed_tasks) > 3 else 'beginner'
+            }
+            volunteer_data.append(volunteer_info)
+        
+        # Create task analysis prompt
+        prompt = f"""
+        You are an AI assistant helping coordinators assign the best volunteers to tasks.
+        
+        TASK DETAILS:
+        - Title: {task_title}
+        - Description: {task_description}
+        - Priority: {task_priority}
+        
+        AVAILABLE VOLUNTEERS:
+        {json.dumps(volunteer_data, indent=2)}
+        
+        Analyze each volunteer's suitability for this task based on:
+        1. Their past task history and performance
+        2. Skills and experience level
+        3. Task complexity and requirements
+        4. Volunteer availability and workload
+        
+        Return a JSON response with this structure:
+        {{
+            "recommendations": [
+                {{
+                    "volunteer_id": "user_id_here",
+                    "volunteer_name": "Volunteer Name",
+                    "match_score": 85,
+                    "reason": "Why this volunteer is recommended for this task",
+                    "confidence": "High/Medium/Low"
+                }}
+            ],
+            "reasoning": "Overall recommendation strategy and analysis"
+        }}
+        
+        Recommend 3-5 best volunteers for this task.
+        """
+        
+        # Generate recommendations using AI
+        response = ai_service.model.generate_content(prompt)
+        
+        try:
+            recommendations = json.loads(response.text)
+            return jsonify({
+                "success": True,
+                "recommendations": recommendations
+            }), 200
+        except json.JSONDecodeError:
+            # Fallback recommendations
+            return jsonify({
+                "success": True,
+                "recommendations": {
+                    "recommendations": [
+                        {
+                            "volunteer_id": volunteer_data[0]['user_id'] if volunteer_data else "none",
+                            "volunteer_name": volunteer_data[0]['name'] if volunteer_data else "No volunteers",
+                            "match_score": 75,
+                            "reason": "General recommendation based on availability",
+                            "confidence": "Medium"
+                        }
+                    ],
+                    "reasoning": "Fallback recommendation due to AI parsing error"
+                }
+            }), 200
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error generating volunteer recommendations: {str(e)}"
+        }), 500
+
+@app.route('/ai/health', methods=['GET'])
+def ai_health_check():
+    """Check AI service health"""
+    try:
+        # Test AI service with a simple query
+        test_response = ai_service.generate_chatbot_response("Hello", {})
+        return jsonify({
+            "status": "healthy",
+            "ai_service": "operational" if test_response['success'] else "error",
+            "message": "AI service is working"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "unhealthy",
+            "ai_service": "error",
+            "message": f"AI service error: {str(e)}"
+        }), 500
+
+# User profile endpoint for chatbot
+@app.route('/user/profile', methods=['GET'])
+@login_required
+def get_user_profile():
+    """Get current user profile for chatbot"""
+    try:
+        current_user_id = session['user_id']
+        user = db_service.get_user(current_user_id)
+        
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+        
+        return jsonify({
+            "user_id": current_user_id,
+            "role": user.get('role'),
+            "name": user.get('name'),
+            "email": user.get('email')
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "message": f"Error getting user profile: {str(e)}"
+        }), 500
+
 if __name__ == '__main__':
-    # For local development
     app.run(debug=True, port=5000)

@@ -1308,6 +1308,30 @@
             </button>
             {% endif %}
           </div>
+          <!-- AI Recommendations Section - Only for Coordinators/Admins -->
+          <div
+            id="ai-recommendations-section"
+            class="dashboard-card"
+            style="margin-bottom: 20px"
+          >
+            <h3 style="margin-bottom: 16px; display: flex; align-items: center">
+              <i class="fas fa-robot text-purple-500 mr-2"></i>
+              AI Volunteer Recommendations
+            </h3>
+            <div id="ai-recommendations" class="text-center py-4">
+              <div
+                class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-500"
+              ></div>
+              <p class="mt-2 text-gray-600">Loading AI recommendations...</p>
+              <p class="mt-1 text-sm text-gray-400">
+                This may take up to 30 seconds...
+              </p>
+              <p class="mt-1 text-xs text-gray-300">
+                Analyzing volunteers and generating assignment suggestions
+              </p>
+            </div>
+          </div>
+
           <div id="tasks-table-container"></div>
         </div>
       </div>
@@ -1952,6 +1976,38 @@
               >Select one or more volunteers for this task</small
             >
           </div>
+
+          <!-- AI Recommendation Option -->
+          <div style="margin-bottom: 12px">
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                cursor: pointer;
+              "
+            >
+              <input
+                type="checkbox"
+                id="ai-recommendation-checkbox"
+                style="transform: scale(1.2)"
+              />
+              <span style="font-weight: 500; color: #333">
+                🤖 Enable AI Recommendations
+              </span>
+            </label>
+            <small
+              style="
+                color: #666;
+                font-size: 12px;
+                margin-left: 24px;
+                display: block;
+              "
+            >
+              AI will suggest the best volunteers for this task based on their
+              history and skills
+            </small>
+          </div>
           <div style="display: flex; gap: 12px; justify-content: flex-end">
             <button
               type="button"
@@ -2075,7 +2131,19 @@
       // --- Role detection (from Jinja) ---
       const USER_ROLE = "{{ current_user.role }}";
 
-      // --- Tab switching logic (handled by script.js) ---
+      // --- Tab switching logic ---
+      const tabButtons = document.querySelectorAll(".tab-button");
+      const tabContents = document.querySelectorAll(".tab-content");
+      tabButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          tabButtons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const tabId = btn.getAttribute("data-tab");
+          tabContents.forEach((tc) => tc.classList.remove("active"));
+          document.getElementById(tabId).classList.add("active");
+          loadTabData(tabId);
+        });
+      });
       // --- Logout button logic ---
       const logoutBtn = document.getElementById("logout-button");
       if (logoutBtn) {
@@ -2404,6 +2472,7 @@
                               ? `<div style="display: flex; gap: 4px; flex-wrap: wrap;">
                                 <button class='btn-primary' onclick='updateTaskCompletion("${t.task_id}")' style="font-size: 0.75rem; padding: 4px 8px;">Update Progress</button>
                                 <button class='btn-secondary' onclick='markTaskCompleted("${t.task_id}")' style="font-size: 0.75rem; padding: 4px 8px;">Mark Complete</button>
+                                <button class='btn-primary' onclick='aiTaskGuide.showTaskGuide("${t.task_id}", "${t.title}")' style="font-size: 0.75rem; padding: 4px 8px; background: #8b5cf6; color: white;">AI Guide</button>
                               </div>`
                               : '<span style="color:#28a745; font-weight: 600;">Completed</span>'
                           }
@@ -2463,6 +2532,7 @@
                               ? `<div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
                                   <button class='btn-primary' onclick='updateTaskCompletion("${task.task_id}")' style="font-size: 0.8rem; padding: 6px 12px;">Update Progress</button>
                                   <button class='btn-secondary' onclick='markTaskCompleted("${task.task_id}")' style="font-size: 0.8rem; padding: 6px 12px;">Mark Complete</button>
+                                  <button class='btn-primary' onclick='aiTaskGuide.showTaskGuide("${task.task_id}", "${task.title}")' style="font-size: 0.8rem; padding: 6px 12px; background: #8b5cf6; color: white;">AI Guide</button>
                                 </div>`
                               : '<span style="color:#28a745; font-weight: 600;">Completed</span>'
                           }
@@ -2542,6 +2612,39 @@
             body: JSON.stringify({ status: "Completed" }),
           });
           if (!resp.ok) throw new Error((await resp.json()).message || "Error");
+
+          // Send email notification to coordinator
+          if (window.emailService) {
+            try {
+              // Get task details and coordinator info
+              const taskResponse = await fetch(`/tasks/${task_id}`, {
+                credentials: "same-origin",
+              });
+              const task = await taskResponse.json();
+
+              // Get coordinator details
+              const coordinatorsResponse = await fetch("/coordinators", {
+                credentials: "same-origin",
+              });
+              const coordinators = await coordinatorsResponse.json();
+
+              // Find the coordinator for this task (assuming first coordinator for now)
+              const coordinator = coordinators[0];
+              if (coordinator && coordinator.email) {
+                await window.emailService.sendTaskCompletedEmail(
+                  coordinator.email,
+                  coordinator.name,
+                  "Volunteer", // Current user name
+                  task.title,
+                  "Task has been marked as completed"
+                );
+              }
+              console.log("Task completion email sent to coordinator");
+            } catch (emailError) {
+              console.error("Error sending task completion email:", emailError);
+            }
+          }
+
           loadTasksVolunteer();
         } catch (e) {
           alert(e.message);
@@ -2572,8 +2675,20 @@
           });
 
           if (!resp.ok) {
-            const error = await resp.json();
-            throw new Error(error.message || "Error updating task completion");
+            // Check if response is JSON before parsing
+            const contentType = resp.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+              const error = await resp.json();
+              throw new Error(
+                error.message || "Error updating task completion"
+              );
+            } else {
+              const text = await resp.text();
+              console.error("Non-JSON error response:", text);
+              throw new Error(
+                `Server error: ${resp.status} ${resp.statusText}`
+              );
+            }
           }
 
           loadTasksVolunteer();
@@ -2951,8 +3066,8 @@
         taskForm.reset();
         taskModalMsg.textContent = "";
 
-        // Populate volunteers dropdown
-        populateVolunteersForTask();
+        // Load volunteers for assignment
+        loadVolunteersForTask();
       }
 
       function closeTaskModal() {
@@ -2982,6 +3097,158 @@
 
       if (cancelTaskBtn) cancelTaskBtn.onclick = closeTaskModal;
       if (addTaskBtn) addTaskBtn.onclick = openTaskModal;
+
+      // Load volunteers for task assignment
+      async function loadVolunteersForTask() {
+        try {
+          const response = await fetch("/volunteers", {
+            credentials: "same-origin",
+          });
+          const volunteers = await response.json();
+
+          const checkboxContainer = document.getElementById(
+            "volunteer-checkboxes"
+          );
+          checkboxContainer.innerHTML = "";
+
+          volunteers.forEach((vol) => {
+            const checkboxDiv = document.createElement("div");
+            checkboxDiv.style.display = "flex";
+            checkboxDiv.style.alignItems = "center";
+            checkboxDiv.style.gap = "8px";
+            checkboxDiv.style.padding = "4px";
+
+            checkboxDiv.innerHTML = `
+              <input type="checkbox" value="${vol.user_id}">
+              <span>${vol.name}</span>
+            `;
+
+            checkboxContainer.appendChild(checkboxDiv);
+          });
+        } catch (error) {
+          console.error("Error loading volunteers:", error);
+        }
+      }
+
+      // AI Recommendation functionality
+      async function getAIRecommendations(taskData) {
+        try {
+          const response = await fetch("/ai/task-recommendations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(taskData),
+          });
+
+          if (!response.ok) throw new Error("Failed to get AI recommendations");
+
+          const result = await response.json();
+          return result.success ? result.recommendations : null;
+        } catch (error) {
+          console.error("AI recommendation error:", error);
+          return null;
+        }
+      }
+
+      function applyAIRecommendations(recommendations) {
+        if (!recommendations || !recommendations.recommendations) return;
+
+        // Clear existing checkboxes
+        const checkboxContainer = document.getElementById(
+          "volunteer-checkboxes"
+        );
+        checkboxContainer.innerHTML = "";
+
+        // Get all volunteers first
+        fetch("/volunteers", { credentials: "same-origin" })
+          .then((res) => res.json())
+          .then((volunteers) => {
+            const volunteerMap = {};
+            volunteers.forEach((vol) => (volunteerMap[vol.user_id] = vol.name));
+
+            // Add recommended volunteers first
+            recommendations.recommendations.forEach((rec) => {
+              const volunteerId = rec.volunteer_id;
+              const volunteerName = volunteerMap[volunteerId] || "Unknown";
+
+              const checkboxDiv = document.createElement("div");
+              checkboxDiv.style.display = "flex";
+              checkboxDiv.style.alignItems = "center";
+              checkboxDiv.style.gap = "8px";
+              checkboxDiv.style.padding = "4px";
+              checkboxDiv.style.backgroundColor = "#e8f5e8";
+              checkboxDiv.style.borderRadius = "4px";
+              checkboxDiv.style.border = "1px solid #4caf50";
+
+              checkboxDiv.innerHTML = `
+                <input type="checkbox" value="${volunteerId}" checked style="transform: scale(1.1);">
+                <span style="font-weight: 500; color: #2e7d32;">${volunteerName}</span>
+                <span style="font-size: 11px; color: #666; margin-left: auto;">AI Recommended (${rec.match_score}%)</span>
+              `;
+
+              checkboxContainer.appendChild(checkboxDiv);
+            });
+
+            // Add other volunteers
+            volunteers.forEach((vol) => {
+              const isRecommended = recommendations.recommendations.some(
+                (rec) => rec.volunteer_id === vol.user_id
+              );
+              if (!isRecommended) {
+                const checkboxDiv = document.createElement("div");
+                checkboxDiv.style.display = "flex";
+                checkboxDiv.style.alignItems = "center";
+                checkboxDiv.style.gap = "8px";
+                checkboxDiv.style.padding = "4px";
+
+                checkboxDiv.innerHTML = `
+                  <input type="checkbox" value="${vol.user_id}">
+                  <span>${vol.name}</span>
+                `;
+
+                checkboxContainer.appendChild(checkboxDiv);
+              }
+            });
+          })
+          .catch((error) => console.error("Error loading volunteers:", error));
+      }
+
+      // Handle AI recommendation checkbox change
+      document
+        .getElementById("ai-recommendation-checkbox")
+        .addEventListener("change", async function (e) {
+          if (e.target.checked) {
+            const title = document.getElementById("task-title").value;
+            const description = document.getElementById("task-desc").value;
+            const priority = document.getElementById("task-priority").value;
+
+            if (!title || !description || !priority) {
+              taskModalMsg.textContent =
+                "Please fill in title, description, and priority first";
+              e.target.checked = false;
+              return;
+            }
+
+            taskModalMsg.textContent = "Getting AI recommendations...";
+
+            const taskData = { title, description, priority };
+            const recommendations = await getAIRecommendations(taskData);
+
+            if (recommendations) {
+              applyAIRecommendations(recommendations);
+              taskModalMsg.textContent = "AI recommendations applied!";
+              taskModalMsg.style.color = "#4caf50";
+            } else {
+              taskModalMsg.textContent = "AI recommendations not available";
+              taskModalMsg.style.color = "#f44336";
+            }
+          } else {
+            // Reset to normal volunteer selection
+            taskModalMsg.textContent = "";
+            // Reload volunteers normally
+            loadVolunteersForTask();
+          }
+        });
 
       taskForm.onsubmit = async function (e) {
         e.preventDefault();
@@ -3019,6 +3286,39 @@
           });
 
           if (!resp.ok) throw new Error((await resp.json()).message || "Error");
+
+          // Send email notifications to assigned volunteers
+          if (selectedVolunteers.length > 0 && window.emailService) {
+            try {
+              // Get volunteer details for email
+              const volunteersResponse = await fetch("/volunteers", {
+                credentials: "same-origin",
+              });
+              const volunteers = await volunteersResponse.json();
+
+              // Send emails to each assigned volunteer
+              for (const volunteerId of selectedVolunteers) {
+                const volunteer = volunteers.find(
+                  (v) => v.user_id === volunteerId
+                );
+                if (volunteer && volunteer.email) {
+                  await window.emailService.sendTaskAssignedEmail(
+                    volunteer.email,
+                    volunteer.name,
+                    title,
+                    description,
+                    deadline
+                  );
+                }
+              }
+              console.log("Task assignment emails sent");
+            } catch (emailError) {
+              console.error(
+                "Error sending task assignment emails:",
+                emailError
+              );
+            }
+          }
 
           closeTaskModal();
           loadTasks(); // Reload tasks after creation
@@ -4786,6 +5086,40 @@
           });
 
           if (response.message) {
+            // Send email notifications to volunteers
+            if (window.emailService) {
+              try {
+                // Get all volunteers for email
+                const volunteersResponse = await fetch("/volunteers", {
+                  credentials: "same-origin",
+                });
+                const volunteers = await volunteersResponse.json();
+
+                // Send emails to volunteers based on target audience
+                let targetVolunteers = volunteers;
+                if (targetAudience === "specific" && selectedUsers.length > 0) {
+                  targetVolunteers = volunteers.filter((v) =>
+                    selectedUsers.includes(v.user_id)
+                  );
+                }
+
+                // Send emails to each target volunteer
+                for (const volunteer of targetVolunteers) {
+                  if (volunteer.email) {
+                    await window.emailService.sendAnnouncementEmail(
+                      volunteer.email,
+                      volunteer.name,
+                      title,
+                      content
+                    );
+                  }
+                }
+                console.log("Announcement emails sent");
+              } catch (emailError) {
+                console.error("Error sending announcement emails:", emailError);
+              }
+            }
+
             showNotification(response.message, "success");
             closeAnnouncementModal();
             loadAnnouncements(); // Refresh the announcements list
@@ -5858,6 +6192,20 @@
         }
       };
     </script>
-    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    <script src="/static/js/script.js?v=2"></script>
+    <script src="/static/js/emailjs-config.js?v=1"></script>
+    <script src="/static/js/ai-components.js?v=2"></script>
+
+    <!-- AI Chatbot Button -->
+    <div id="chatbot-button-container"></div>
+    <script>
+      // Add chatbot button after page loads
+      document.addEventListener("DOMContentLoaded", function () {
+        const container = document.getElementById("chatbot-button-container");
+        if (container && window.addChatbotToggleButton) {
+          container.innerHTML = addChatbotToggleButton();
+        }
+      });
+    </script>
   </body>
 </html>
