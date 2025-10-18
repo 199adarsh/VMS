@@ -24,17 +24,17 @@
       }
 
       .dashboard-bg {
-        background: linear-gradient(120deg, #f8fafc 0%, #f4f5f7 100%);
+        background: linear-gradient(120deg, #ffffff 0%, #ffffff 100%);
         min-height: 100vh;
         padding: 0 4px;
       }
 
       .dashboard-container {
-        max-width: 1100px;
+        max-width: 1200px;
         margin: 8px auto;
         background: #fff;
         border-radius: 8px;
-        box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.08);
+        border: 1px solid #e3e5e8;
         padding: 16px 12px;
         width: 100%;
         box-sizing: border-box;
@@ -1316,7 +1316,7 @@
           >
             <h3 style="margin-bottom: 16px; display: flex; align-items: center">
               <i class="fas fa-robot text-purple-500 mr-2"></i>
-              AI Volunteer Recommendations
+              AI Future Task Recommendations
             </h3>
             <div id="ai-recommendations" class="text-center py-4">
               <div
@@ -1327,7 +1327,7 @@
                 This may take up to 30 seconds...
               </p>
               <p class="mt-1 text-xs text-gray-300">
-                Analyzing volunteers and generating assignment suggestions
+                Analyzing ongoing tasks and generating future task suggestions
               </p>
             </div>
           </div>
@@ -1993,7 +1993,7 @@
                 style="transform: scale(1.2)"
               />
               <span style="font-weight: 500; color: #333">
-                🤖 Enable AI Recommendations
+                🤖 Enable AI Future Task Recommendations
               </span>
             </label>
             <small
@@ -2286,16 +2286,59 @@
 
       // --- Loaders for each tab ---
       async function loadTasks() {
-        if (USER_ROLE === "admin") return loadTasksAdmin();
-        if (USER_ROLE === "coordinator") return loadTasksCoordinator();
-        if (USER_ROLE === "volunteer") return loadTasksVolunteer();
+        if (USER_ROLE === "admin") {
+          await loadTasksAdmin();
+          await loadFutureTaskRecommendations();
+        } else if (USER_ROLE === "coordinator") {
+          await loadTasksCoordinator();
+          await loadFutureTaskRecommendations();
+        } else if (USER_ROLE === "volunteer") {
+          await loadTasksVolunteer();
+        }
       }
       async function loadTasksAdmin() {
         const el = document.getElementById("tasks-table-container");
         showLoading(el);
         try {
           const data = await apiGet("/tasks");
-          renderTasksTable(data);
+          const isMobile = window.innerWidth < 1024;
+          if (isMobile) {
+            renderTasksMobile(data);
+          } else {
+            let html = `<table class='dashboard-table'><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Progress</th><th>Assigned To</th><th>Actions</th></tr></thead><tbody>`;
+            html += data
+              .map((t) => {
+                const completion = t.completion_percentage || 0;
+                return `<tr>
+                      <td>${t.title}</td>
+                      <td>${t.deadline}</td>
+                      <td>${t.status}</td>
+                      <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <div style="width: 60px; height: 8px; background: #e3e5e8; border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${completion}%; height: 100%; background: ${
+                  completion === 100
+                    ? "#4caf50"
+                    : completion > 0
+                    ? "#2196f3"
+                    : "#e3e5e8"
+                }; transition: width 0.3s ease;"></div>
+            </div>
+                          <span style="font-size: 0.85rem; color: #666; min-width: 35px;">${completion}%</span>
+            </div>
+                      </td>
+                      <td>${t.assigned_to || "-"}</td>
+                      <td>
+                        <button class='btn-primary' style='background:#d32f2f;' onclick='deleteTask("${
+                          t.task_id
+                        }")'>Delete</button>
+                      </td>
+                    </tr>`;
+              })
+              .join("");
+            html += "</tbody></table>";
+            el.innerHTML = html;
+          }
         } catch (e) {
           showError(el, e.message);
         }
@@ -2343,11 +2386,8 @@
                             ${
                               t.status === "Completed"
                                 ? `<button class='btn-primary' style='background:#ffc107; color:#000; margin-right: 8px;' onclick='rateTask("${t.task_id}")'>Rate</button>`
-                                : ""
+                                : `<button class='btn-primary' style='background:#d32f2f;' onclick='deleteTaskCoordinator("${t.task_id}")'>Delete</button>`
                             }
-                            <button class='btn-primary' style='background:#d32f2f;' onclick='deleteTaskCoordinator("${
-                              t.task_id
-                            }")'>Delete</button>
                           </td>
                       </tr>`;
             });
@@ -2407,11 +2447,8 @@
                           ${
                             task.status === "Completed"
                               ? `<button class='btn-primary' style='background:#ffc107; color:#000; margin-right: 8px;' onclick='rateTask("${task.task_id}")'>Rate Task</button>`
-                              : ""
+                              : `<button class='btn-primary' style='background:#d32f2f;' onclick='deleteTaskCoordinator("${task.task_id}")'>Delete</button>`
                           }
-                          <button class='btn-primary' style='background:#d32f2f;' onclick='deleteTaskCoordinator("${
-                            task.task_id
-                          }")'>Delete</button>
                       </div>
                   </div>
               `;
@@ -2915,47 +2952,6 @@
         loadMyAttendance();
       };
 
-      function renderTasksTable(tasks) {
-        const isMobile = window.innerWidth < 1024;
-        if (isMobile) {
-          renderTasksMobile(tasks);
-        } else {
-          let html = `<table class='dashboard-table'><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Progress</th><th>Assigned To</th><th>Actions</th></tr></thead><tbody>`;
-          html += tasks
-            .map((t) => {
-              const completion = t.completion_percentage || 0;
-              return `<tr>
-                    <td>${t.title}</td>
-                    <td>${t.deadline}</td>
-                    <td>${t.status}</td>
-                    <td>
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <div style="width: 60px; height: 8px; background: #e3e5e8; border-radius: 4px; overflow: hidden;">
-                          <div style="width: ${completion}%; height: 100%; background: ${
-                completion === 100
-                  ? "#4caf50"
-                  : completion > 0
-                  ? "#2196f3"
-                  : "#e3e5e8"
-              }; transition: width 0.3s ease;"></div>
-          </div>
-                        <span style="font-size: 0.85rem; color: #666; min-width: 35px;">${completion}%</span>
-          </div>
-                    </td>
-                    <td>${t.assigned_to || "-"}</td>
-                    <td>
-                      <button class='btn-primary' style='background:#d32f2f;' onclick='deleteTask("${
-                        t.task_id
-                      }")'>Delete</button>
-                    </td>
-                  </tr>`;
-            })
-            .join("");
-          html += "</tbody></table>";
-          document.getElementById("tasks-table-container").innerHTML = html;
-        }
-      }
-
       function renderTasksMobile(tasks) {
         let html = `<div class='mobile-task-list'>`;
         tasks.forEach((task) => {
@@ -3147,6 +3143,152 @@
         } catch (error) {
           console.error("AI recommendation error:", error);
           return null;
+        }
+      }
+
+      // Future Task Recommendations functionality
+      async function loadFutureTaskRecommendations() {
+        const el = document.getElementById("ai-recommendations");
+        if (!el) return;
+
+        try {
+          const response = await fetch("/ai/future-task-recommendations", {
+            method: "GET",
+            credentials: "same-origin",
+          });
+
+          if (!response.ok)
+            throw new Error("Failed to get future task recommendations");
+
+          const result = await response.json();
+
+          if (result.success && result.recommendations) {
+            renderFutureTaskRecommendations(result.recommendations, el);
+          } else {
+            el.innerHTML = `
+              <div class="text-center py-4">
+                <i class="fas fa-exclamation-triangle text-yellow-500 text-2xl mb-2"></i>
+                <p class="text-gray-600">No future task recommendations available</p>
+                <p class="text-sm text-gray-400 mt-1">${
+                  result.message ||
+                  "Unable to generate recommendations at this time"
+                }</p>
+              </div>
+            `;
+          }
+        } catch (error) {
+          console.error("Future task recommendations error:", error);
+          el.innerHTML = `
+            <div class="text-center py-4">
+              <i class="fas fa-exclamation-triangle text-red-500 text-2xl mb-2"></i>
+              <p class="text-gray-600">Error loading recommendations</p>
+              <p class="text-sm text-gray-400 mt-1">Please try again later</p>
+            </div>
+          `;
+        }
+      }
+
+      function renderFutureTaskRecommendations(recommendations, container) {
+        const recs = recommendations.recommendations || [];
+
+        if (recs.length === 0) {
+          container.innerHTML = `
+            <div class="text-center py-4">
+              <i class="fas fa-lightbulb text-blue-500 text-2xl mb-2"></i>
+              <p class="text-gray-600">No ongoing tasks found</p>
+              <p class="text-sm text-gray-400 mt-1">Create some tasks to get AI recommendations</p>
+            </div>
+          `;
+          return;
+        }
+
+        let html = `<div class="space-y-4">`;
+
+        recs.forEach((rec, index) => {
+          const priorityColor =
+            rec.priority === "High"
+              ? "text-red-600"
+              : rec.priority === "Medium"
+              ? "text-yellow-600"
+              : "text-green-600";
+          const categoryColor =
+            rec.category === "Follow-up"
+              ? "bg-blue-100 text-blue-800"
+              : rec.category === "Enhancement"
+              ? "bg-green-100 text-green-800"
+              : rec.category === "Maintenance"
+              ? "bg-yellow-100 text-yellow-800"
+              : "bg-purple-100 text-purple-800";
+
+          html += `
+            <div class="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div class="flex justify-between items-start mb-2">
+                <h4 class="font-semibold text-gray-800 text-sm">${
+                  rec.title
+                }</h4>
+                <span class="px-2 py-1 text-xs rounded-full ${categoryColor}">${
+            rec.category
+          }</span>
+              </div>
+              <p class="text-gray-600 text-sm mb-3">${rec.description}</p>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">${
+                  rec.priority
+                } Priority</span>
+                <span class="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">${
+                  rec.estimated_duration
+                }</span>
+              </div>
+              ${
+                rec.suggested_skills && rec.suggested_skills.length > 0
+                  ? `
+                <div class="text-xs text-gray-500">
+                  <strong>Suggested skills:</strong> ${rec.suggested_skills.join(
+                    ", "
+                  )}
+                </div>
+              `
+                  : ""
+              }
+              <div class="mt-3 flex gap-2">
+                <button onclick="createTaskFromRecommendation('${
+                  rec.title
+                }', '${rec.description.replace(/'/g, "\\'")}', '${
+            rec.priority
+          }')" 
+                        class="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors">
+                  <i class="fas fa-plus mr-1"></i> Create Task
+                </button>
+                <button onclick="dismissRecommendation(${index})" 
+                        class="px-3 py-1 bg-gray-300 text-gray-700 text-xs rounded hover:bg-gray-400 transition-colors">
+                  <i class="fas fa-times mr-1"></i> Dismiss
+                </button>
+              </div>
+            </div>
+          `;
+        });
+
+        html += `</div>`;
+        container.innerHTML = html;
+      }
+
+      function createTaskFromRecommendation(title, description, priority) {
+        // Open the add task modal with pre-filled data
+        document.getElementById("task-title").value = title;
+        document.getElementById("task-desc").value = description;
+        document.getElementById("task-priority").value = priority;
+
+        // Show the modal
+        document.getElementById("task-modal").style.display = "block";
+      }
+
+      function dismissRecommendation(index) {
+        // Simple dismissal - just hide the recommendation
+        const recommendations = document.querySelectorAll(
+          "#ai-recommendations .space-y-4 > div"
+        );
+        if (recommendations[index]) {
+          recommendations[index].style.display = "none";
         }
       }
 
@@ -5746,7 +5888,44 @@
           if (assignedTo) params.append("assigned_to", assignedTo);
           const url = `/tasks/filter?${params.toString()}`;
           const data = await apiGet(url);
-          renderTasksTable(data);
+          const isMobile = window.innerWidth < 1024;
+          if (isMobile) {
+            renderTasksMobile(data);
+          } else {
+            let html = `<table class='dashboard-table'><thead><tr><th>Task</th><th>Deadline</th><th>Status</th><th>Progress</th><th>Assigned To</th><th>Actions</th></tr></thead><tbody>`;
+            html += data
+              .map((t) => {
+                const completion = t.completion_percentage || 0;
+                return `<tr>
+                      <td>${t.title}</td>
+                      <td>${t.deadline}</td>
+                      <td>${t.status}</td>
+                      <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <div style="width: 60px; height: 8px; background: #e3e5e8; border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${completion}%; height: 100%; background: ${
+                  completion === 100
+                    ? "#4caf50"
+                    : completion > 0
+                    ? "#2196f3"
+                    : "#e3e5e8"
+                }; transition: width 0.3s ease;"></div>
+            </div>
+                          <span style="font-size: 0.85rem; color: #666; min-width: 35px;">${completion}%</span>
+            </div>
+                      </td>
+                      <td>${t.assigned_to || "-"}</td>
+                      <td>
+                        <button class='btn-primary' style='background:#d32f2f;' onclick='deleteTask("${
+                          t.task_id
+                        }")'>Delete</button>
+                      </td>
+                    </tr>`;
+              })
+              .join("");
+            html += "</tbody></table>";
+            el.innerHTML = html;
+          }
         } catch (e) {
           showError(el, e.message);
         }

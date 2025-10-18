@@ -71,3 +71,4 @@ firebase-adminsdk-*.json
 # Temporary files
 *.tmp
 *.temp
+.vercel

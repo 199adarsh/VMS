@@ -260,6 +260,174 @@ Focus on volunteers who would be most suitable for current task assignments."""
                 "message": "Failed to generate volunteer recommendations"
             }
     
+    def generate_future_task_recommendations(self, ongoing_tasks: List[Dict], user_context: Dict = None) -> Dict:
+        """Generate 3 future task recommendations based on ongoing tasks context"""
+        try:
+            if not ongoing_tasks:
+                return {
+                    "success": True,
+                    "recommendations": {
+                        "recommendations": [],
+                        "reasoning": "No ongoing tasks found to base recommendations on"
+                    }
+                }
+            
+            # Analyze ongoing tasks to understand context
+            task_analysis = self._analyze_ongoing_tasks(ongoing_tasks)
+            
+            prompt = f"""You are an AI assistant helping coordinators plan future tasks based on their current ongoing work.
+
+CURRENT ONGOING TASKS CONTEXT:
+{task_analysis}
+
+Based on the ongoing tasks above, suggest 3 future tasks that would logically follow or complement the current work.
+
+Return ONLY a JSON object with this exact structure:
+{{
+    "recommendations": [
+        {{
+            "title": "Future Task Title 1",
+            "description": "Brief task description",
+            "priority": "High/Medium/Low",
+            "estimated_duration": "2-4 hours",
+            "category": "Follow-up/Enhancement/Maintenance/New Initiative",
+            "suggested_skills": ["skill1", "skill2", "skill3"]
+        }},
+        {{
+            "title": "Future Task Title 2", 
+            "description": "Brief task description",
+            "priority": "High/Medium/Low",
+            "estimated_duration": "1-3 hours",
+            "category": "Follow-up/Enhancement/Maintenance/New Initiative",
+            "suggested_skills": ["skill1", "skill2", "skill3"]
+        }},
+        {{
+            "title": "Future Task Title 3",
+            "description": "Brief task description", 
+            "priority": "High/Medium/Low",
+            "estimated_duration": "3-5 hours",
+            "category": "Follow-up/Enhancement/Maintenance/New Initiative",
+            "suggested_skills": ["skill1", "skill2", "skill3"]
+        }}
+    ]
+}}
+
+Make the recommendations practical and specific. Keep descriptions brief and direct. Return ONLY the JSON, no other text.
+"""
+            
+            response = self.model.generate_content(prompt)
+            
+            try:
+                # Clean the response text by removing markdown code blocks
+                response_text = response.text.strip()
+                if response_text.startswith('```json'):
+                    response_text = response_text[7:]  # Remove ```json
+                if response_text.endswith('```'):
+                    response_text = response_text[:-3]  # Remove ```
+                response_text = response_text.strip()
+                
+                recommendations = json.loads(response_text)
+                return {
+                    "success": True,
+                    "recommendations": recommendations
+                }
+            except json.JSONDecodeError:
+                # Fallback if JSON parsing fails
+                return {
+                    "success": True,
+                    "recommendations": {
+                        "recommendations": [
+                            {
+                                "title": "Follow-up Task 1",
+                                "description": "Continue building on current project progress",
+                                "priority": "Medium",
+                                "estimated_duration": "2-3 hours",
+                                "category": "Follow-up",
+                                "suggested_skills": ["Project Management", "Communication"]
+                            },
+                            {
+                                "title": "Enhancement Task 2", 
+                                "description": "Improve and expand current initiatives",
+                                "priority": "Low",
+                                "estimated_duration": "1-2 hours",
+                                "category": "Enhancement",
+                                "suggested_skills": ["Analysis", "Planning"]
+                            },
+                            {
+                                "title": "Maintenance Task 3",
+                                "description": "Ongoing support and maintenance activities",
+                                "priority": "Medium", 
+                                "estimated_duration": "1-3 hours",
+                                "category": "Maintenance",
+                                "suggested_skills": ["Support", "Documentation"]
+                            }
+                        ]
+                    }
+                }
+                
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "message": "Failed to generate future task recommendations"
+            }
+    
+    def _analyze_ongoing_tasks(self, ongoing_tasks: List[Dict]) -> str:
+        """Analyze ongoing tasks to understand current work context"""
+        if not ongoing_tasks:
+            return "No ongoing tasks available for analysis."
+        
+        task_summaries = []
+        categories = []
+        priorities = []
+        
+        for task in ongoing_tasks:
+            title = task.get('title', 'Unknown Task')
+            description = task.get('description', 'No description')
+            priority = task.get('priority', 'Medium')
+            status = task.get('status', 'In Progress')
+            deadline = task.get('deadline', 'No deadline')
+            
+            task_summaries.append(f"- {title} ({priority} priority, {status}, Due: {deadline})")
+            priorities.append(priority)
+            
+            # Extract category from title/description
+            title_lower = title.lower()
+            if any(word in title_lower for word in ['event', 'meeting', 'coordination']):
+                categories.append('Event Management')
+            elif any(word in title_lower for word in ['data', 'analysis', 'report']):
+                categories.append('Data & Analysis')
+            elif any(word in title_lower for word in ['outreach', 'communication', 'marketing']):
+                categories.append('Communication')
+            elif any(word in title_lower for word in ['training', 'education', 'workshop']):
+                categories.append('Training & Development')
+            else:
+                categories.append('General Operations')
+        
+        # Count patterns
+        from collections import Counter
+        priority_counts = Counter(priorities)
+        category_counts = Counter(categories)
+        
+        analysis = f"""
+ONGOING TASKS SUMMARY:
+{chr(10).join(task_summaries)}
+
+WORK CONTEXT ANALYSIS:
+- Total ongoing tasks: {len(ongoing_tasks)}
+- Most common priority: {priority_counts.most_common(1)[0][0] if priority_counts else 'N/A'}
+- Primary work areas: {', '.join([cat for cat, count in category_counts.most_common(3)]) if category_counts else 'General'}
+- Current focus: {category_counts.most_common(1)[0][0] if category_counts else 'Mixed activities'}
+
+TASK PATTERNS:
+- High priority tasks: {priority_counts.get('High', 0)}
+- Medium priority tasks: {priority_counts.get('Medium', 0)} 
+- Low priority tasks: {priority_counts.get('Low', 0)}
+- Work distribution: {dict(category_counts)}
+"""
+        
+        return analysis
+
     def _analyze_task_history(self, past_tasks: List[Dict]) -> str:
         """Analyze user's task history to identify patterns and preferences"""
         if not past_tasks:

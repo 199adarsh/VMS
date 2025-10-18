@@ -636,7 +636,7 @@
           font-family: 'Bricolage Grotesque', Arial, sans-serif;
         "
       >
-        VMS
+        SVP
       </div>
       <nav
         class="navbar-slide"
@@ -649,54 +649,67 @@
         "
       >
         <a
-          href="#"
+          href="#home"
+          class="nav-link"
           style="
             color: #ffffff;
             font-weight: 500;
             font-size: 1.1rem;
             text-decoration: none;
             font-family: 'Bricolage Grotesque', Arial, sans-serif;
+            transition: color 0.3s ease;
+            cursor: pointer;
           "
           >Home</a
         >
         <a
-          href="#"
+          href="#about"
+          class="nav-link"
           style="
             color: #ffffff;
             font-weight: 500;
             font-size: 1.1rem;
             text-decoration: none;
             font-family: 'Bricolage Grotesque', Arial, sans-serif;
+            transition: color 0.3s ease;
+            cursor: pointer;
           "
           >About</a
         >
         <a
-          href="#"
+          href="#features"
+          class="nav-link"
           style="
             color: #ffffff;
             font-weight: 500;
             font-size: 1.1rem;
             text-decoration: none;
             font-family: 'Bricolage Grotesque', Arial, sans-serif;
+            transition: color 0.3s ease;
+            cursor: pointer;
+          "
+          >Features</a
+        >
+        <a
+          href="#contact"
+          class="nav-link"
+          style="
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 1.1rem;
+            text-decoration: none;
+            font-family: 'Bricolage Grotesque', Arial, sans-serif;
+            transition: color 0.3s ease;
+            cursor: pointer;
           "
           >Contact</a
         >
-        <a
-          href="#"
-          style="
-            color: #ffffff;
-            font-weight: 500;
-            font-size: 1.1rem;
-            text-decoration: none;
-            font-family: 'Bricolage Grotesque', Arial, sans-serif;
-          "
-          >Pricing</a
-        >
-        <button class="btn-primary-cta">Primary CTA</button>
+        <button class="btn-primary-cta" id="loginBtn">Get Started</button>
       </nav>
     </header>
 
     <section
+      id="home"
       class="hero-section"
       style="background-image:url('{{ url_for('static', filename='IMG/bg.png') }}');"
     >
@@ -789,7 +802,7 @@
       </div>
     </section>
 
-    <section class="features-section">
+    <section id="features" class="features-section">
       <div class="features-header">
         <h2 class="features-title">Make every step volunteer-driven</h2>
         <p class="features-subtitle">
@@ -1105,7 +1118,7 @@
       </button>
     </div>
 
-    <footer class="footer" style="width: 100%; max-width: 100%">
+    <footer id="about" class="footer" style="width: 100%; max-width: 100%">
       <div class="footer-main">
         <div class="footer-about">
           <div class="footer-about-title">
@@ -1124,11 +1137,11 @@
             <a href="#"><i class="fa-brands fa-github"></i></a>
           </div>
         </div>
-        <div class="footer-col">
+        <div id="contact" class="footer-col">
           <div class="footer-col-title">Company</div>
-          <a href="#">About</a>
-          <a href="#">Features</a>
-          <a href="#">Works</a>
+          <a href="#about">About</a>
+          <a href="#features">Features</a>
+          <a href="#contact">Contact</a>
           <a href="#">Career</a>
         </div>
         <div class="footer-col">
@@ -1164,17 +1177,17 @@
       firebase.initializeApp(firebaseConfig);
       const auth = firebase.auth();
 
-      // DOM Elements (already declared in script.js)
-      // const loginSection = document.getElementById("login-section");
-      // const registerSection = document.getElementById("register-section");
-      // const loginForm = document.getElementById("login-form");
-      // const registerForm = document.getElementById("register-form");
-      // const googleLoginBtn = document.getElementById("google-login-btn");
-      // const googleRegisterBtn = document.getElementById("google-register-btn");
-      // const showRegisterBtn = document.getElementById("show-register-btn");
-      // const showLoginBtn = document.getElementById("show-login-btn");
-      // const loginMessage = document.getElementById("login-message");
-      // const registerMessage = document.getElementById("register-message");
+      // DOM Elements
+      const loginSection = document.getElementById("login-section");
+      const registerSection = document.getElementById("register-section");
+      const loginForm = document.getElementById("login-form");
+      const registerForm = document.getElementById("register-form");
+      const googleLoginBtn = document.getElementById("google-login-btn");
+      const googleRegisterBtn = document.getElementById("google-register-btn");
+      const showRegisterBtn = document.getElementById("show-register-btn");
+      const showLoginBtn = document.getElementById("show-login-btn");
+      const loginMessage = document.getElementById("login-message");
+      const registerMessage = document.getElementById("register-message");
 
       // Utility Functions
       function showMessage(element, message, type = "success") {
@@ -1190,8 +1203,7 @@
       }
 
       async function apiRequest(endpoint, method = "GET", data = null) {
-        // Use relative URLs for Vercel deployment
-        const url = `${endpoint}`;
+        const url = `http://127.0.0.1:5000${endpoint}`;
         const options = {
           method,
           headers: {
@@ -1216,162 +1228,160 @@
       // Google Auth Provider
       const googleProvider = new firebase.auth.GoogleAuthProvider();
 
-      // Event Listeners (moved to script.js)
-      // showRegisterBtn.addEventListener("click", () => {
-      //   loginSection.classList.add("hidden");
-      //   registerSection.classList.remove("hidden");
-      // });
+      // Event Listeners
+      showRegisterBtn.addEventListener("click", () => {
+        loginSection.classList.add("hidden");
+        registerSection.classList.remove("hidden");
+      });
 
-      // showLoginBtn.addEventListener("click", () => {
-      //   registerSection.classList.add("hidden");
-      //   loginSection.classList.remove("hidden");
-      // });
+      showLoginBtn.addEventListener("click", () => {
+        registerSection.classList.add("hidden");
+        loginSection.classList.remove("hidden");
+      });
 
-      // Login Form (moved to script.js)
-      // loginForm.addEventListener("submit", async (e) => {
-      //   e.preventDefault();
-      //   const email = loginForm.email.value;
-      //   const password = loginForm.password.value;
+      // Login Form
+      loginForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = loginForm.email.value;
+        const password = loginForm.password.value;
 
-      //   try {
-      //     const response = await apiRequest("/login", "POST", {
-      //       email,
-      //       password,
-      //     });
-      //     if (response && response.redirect_to) {
-      //       window.location.href = response.redirect_to;
-      //     }
-      //   } catch (error) {
-      //     showMessage(loginMessage, error.message, "error");
-      //   }
-      // });
+        try {
+          const response = await apiRequest("/login", "POST", {
+            email,
+            password,
+          });
+          if (response && response.redirect_to) {
+            window.location.href = response.redirect_to;
+          }
+        } catch (error) {
+          showMessage(loginMessage, error.message, "error");
+        }
+      });
 
-      // Register Form (moved to script.js)
-      // registerForm.addEventListener("submit", async (e) => {
-      //   e.preventDefault();
-      //   const name = registerForm.name.value;
-      //   const email = registerForm.email.value;
-      //   const password = registerForm.password.value;
-      //   const contact = registerForm.contact.value;
-      //   const role = registerForm.role.value;
+      // Register Form
+      registerForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = registerForm.name.value;
+        const email = registerForm.email.value;
+        const password = registerForm.password.value;
+        const contact = registerForm.contact.value;
+        const role = registerForm.role.value;
 
-      //   try {
-      //     const response = await apiRequest("/register", "POST", {
-      //       name,
-      //       email,
-      //       password,
-      //       contact,
-      //       role,
-      //       provider: "email",
-      //     });
-      //     if (response && response.redirect_to) {
-      //       window.location.href = response.redirect_to;
-      //     }
-      //   } catch (error) {
-      //     showMessage(registerMessage, error.message, "error");
-      //   }
-      // });
+        try {
+          const response = await apiRequest("/register", "POST", {
+            name,
+            email,
+            password,
+            contact,
+            role,
+            provider: "email",
+          });
+          if (response && response.redirect_to) {
+            window.location.href = response.redirect_to;
+          }
+        } catch (error) {
+          showMessage(registerMessage, error.message, "error");
+        }
+      });
 
-      // Google Login (moved to script.js)
-      // googleLoginBtn.addEventListener("click", async () => {
-      //   try {
-      //     console.log("Starting Google login...");
-      //     console.log("Firebase config:", firebaseConfig);
-      //     console.log("Google provider:", googleProvider);
-      //     console.log("Auth object:", auth);
-      //     console.log("Current user before login:", auth.currentUser);
+      // Google Login
+      googleLoginBtn.addEventListener("click", async () => {
+        try {
+          console.log("Starting Google login...");
+          console.log("Firebase config:", firebaseConfig);
+          console.log("Google provider:", googleProvider);
+          console.log("Auth object:", auth);
+          console.log("Current user before login:", auth.currentUser);
 
-      //     const result = await auth.signInWithPopup(googleProvider);
-      //     console.log("Google popup result:", result);
-      //     console.log("User object:", result.user);
-      //     console.log("User email:", result.user.email);
-      //     console.log("User display name:", result.user.displayName);
+          const result = await auth.signInWithPopup(googleProvider);
+          console.log("Google popup result:", result);
+          console.log("User object:", result.user);
+          console.log("User email:", result.user.email);
+          console.log("User display name:", result.user.displayName);
 
-      //     const idToken = await result.user.getIdToken();
-      //     console.log("Got ID token:", idToken ? "Yes" : "No");
-      //     console.log("ID token length:", idToken ? idToken.length : 0);
+          const idToken = await result.user.getIdToken();
+          console.log("Got ID token:", idToken ? "Yes" : "No");
+          console.log("ID token length:", idToken ? idToken.length : 0);
 
-      //     const response = await apiRequest("/auth/google", "POST", {
-      //       id_token: idToken,
-      //     });
-      //     console.log("Backend response:", response);
+          const response = await apiRequest("/auth/google", "POST", {
+            id_token: idToken,
+          });
+          console.log("Backend response:", response);
 
-      //     if (response && response.redirect_to) {
-      //       window.location.href = response.redirect_to;
-      //     }
-      //   } catch (error) {
-      //     console.error("Google login error:", error);
-      //     console.error("Error code:", error.code);
-      //     console.error("Error message:", error.message);
-      //     console.error("Full error object:", error);
+          if (response && response.redirect_to) {
+            window.location.href = response.redirect_to;
+          }
+        } catch (error) {
+          console.error("Google login error:", error);
+          console.error("Error code:", error.code);
+          console.error("Error message:", error.message);
+          console.error("Full error object:", error);
 
-      //     let errorMessage = "Google login failed. Please try again.";
+          let errorMessage = "Google login failed. Please try again.";
 
-      //     if (error.code === "auth/popup-closed-by-user") {
-      //       errorMessage = "Google login was cancelled. Please try again.";
-      //     } else if (error.code === "auth/popup-blocked") {
-      //       errorMessage =
-      //         "Popup was blocked. Please allow popups and try again.";
-      //     } else if (error.code === "auth/network-request-failed") {
-      //       errorMessage =
-      //         "Network error. Please check your connection and try again.";
-      //     } else if (error.code === "auth/operation-not-allowed") {
-      //       errorMessage =
-      //         "Google sign-in is not enabled. Please contact support.";
-      //     } else if (error.code === "auth/unauthorized-domain") {
-      //       errorMessage = "This domain is not authorized for Google sign-in.";
-      //     } else if (error.code === "auth/configuration-not-found") {
-      //       errorMessage =
-      //         "Firebase configuration error. Please contact support.";
-      //     }
+          if (error.code === "auth/popup-closed-by-user") {
+            errorMessage = "Google login was cancelled. Please try again.";
+          } else if (error.code === "auth/popup-blocked") {
+            errorMessage =
+              "Popup was blocked. Please allow popups and try again.";
+          } else if (error.code === "auth/network-request-failed") {
+            errorMessage =
+              "Network error. Please check your connection and try again.";
+          } else if (error.code === "auth/operation-not-allowed") {
+            errorMessage =
+              "Google sign-in is not enabled. Please contact support.";
+          } else if (error.code === "auth/unauthorized-domain") {
+            errorMessage = "This domain is not authorized for Google sign-in.";
+          } else if (error.code === "auth/configuration-not-found") {
+            errorMessage =
+              "Firebase configuration error. Please contact support.";
+          }
 
-      //     showMessage(loginMessage, errorMessage, "error");
-      //   }
-      // });
+          showMessage(loginMessage, errorMessage, "error");
+        }
+      });
 
-      // Google Register (moved to script.js)
-      // googleRegisterBtn.addEventListener("click", async () => {
-      //   try {
-      //     console.log("Starting Google registration...");
-      //     const result = await auth.signInWithPopup(googleProvider);
-      //     console.log("Google popup result:", result);
+      // Google Register
+      googleRegisterBtn.addEventListener("click", async () => {
+        try {
+          console.log("Starting Google registration...");
+          const result = await auth.signInWithPopup(googleProvider);
+          console.log("Google popup result:", result);
 
-      //     const idToken = await result.user.getIdToken();
-      //     console.log("Got ID token:", idToken ? "Yes" : "No");
+          const idToken = await result.user.getIdToken();
+          console.log("Got ID token:", idToken ? "Yes" : "No");
 
-      //     const role = registerForm
-      //       ? registerForm.role.value || "volunteer"
-      //       : "volunteer";
-      //     const contact = registerForm ? registerForm.contact.value || "" : "";
+          const role = registerForm.role.value || "volunteer";
+          const contact = registerForm.contact.value || "";
 
-      //     const response = await apiRequest("/auth/google/register", "POST", {
-      //       id_token: idToken,
-      //       role: role,
-      //       contact: contact,
-      //     });
-      //     console.log("Backend response:", response);
+          const response = await apiRequest("/auth/google/register", "POST", {
+            id_token: idToken,
+            role: role,
+            contact: contact,
+          });
+          console.log("Backend response:", response);
 
-      //     if (response && response.redirect_to) {
-      //       window.location.href = response.redirect_to;
-      //     }
-      //   } catch (error) {
-      //     console.error("Google registration error:", error);
-      //     let errorMessage = "Google registration failed. Please try again.";
+          if (response && response.redirect_to) {
+            window.location.href = response.redirect_to;
+          }
+        } catch (error) {
+          console.error("Google registration error:", error);
+          let errorMessage = "Google registration failed. Please try again.";
 
-      //     if (error.code === "auth/popup-closed-by-user") {
-      //       errorMessage =
-      //         "Google registration was cancelled. Please try again.";
-      //     } else if (error.code === "auth/popup-blocked") {
-      //       errorMessage =
-      //         "Popup was blocked. Please allow popups and try again.";
-      //     } else if (error.code === "auth/network-request-failed") {
-      //       errorMessage =
-      //         "Network error. Please check your connection and try again.";
-      //     }
+          if (error.code === "auth/popup-closed-by-user") {
+            errorMessage =
+              "Google registration was cancelled. Please try again.";
+          } else if (error.code === "auth/popup-blocked") {
+            errorMessage =
+              "Popup was blocked. Please allow popups and try again.";
+          } else if (error.code === "auth/network-request-failed") {
+            errorMessage =
+              "Network error. Please check your connection and try again.";
+          }
 
-      //     showMessage(registerMessage, errorMessage, "error");
-      //   }
-      // });
+          showMessage(registerMessage, errorMessage, "error");
+        }
+      });
 
       // Test Firebase connection
       function testFirebaseConnection() {
@@ -1390,6 +1400,51 @@
           return false;
         }
       }
+
+      // Navigation functionality
+      document.addEventListener("DOMContentLoaded", function () {
+        // Smooth scrolling for navigation links
+        const navLinks = document.querySelectorAll(".nav-link");
+        navLinks.forEach((link) => {
+          link.addEventListener("click", function (e) {
+            e.preventDefault();
+            const targetId = this.getAttribute("href").substring(1);
+            const targetElement = document.getElementById(targetId);
+
+            if (targetElement) {
+              targetElement.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }
+          });
+        });
+
+        // Login button functionality
+        const loginBtn = document.getElementById("loginBtn");
+        if (loginBtn) {
+          loginBtn.addEventListener("click", function () {
+            // Scroll to the authentication section
+            const authSection = document.getElementById("auth-section");
+            if (authSection) {
+              authSection.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+              });
+            }
+          });
+        }
+
+        // Add hover effects to nav links
+        navLinks.forEach((link) => {
+          link.addEventListener("mouseenter", function () {
+            this.style.color = "#3b82f6";
+          });
+          link.addEventListener("mouseleave", function () {
+            this.style.color = "#ffffff";
+          });
+        });
+      });
 
       // Check if user is already logged in
       document.addEventListener("DOMContentLoaded", async function () {

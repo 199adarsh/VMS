@@ -2372,6 +2372,46 @@ def get_volunteer_recommendations():
             "message": f"Error generating volunteer recommendations: {str(e)}"
         }), 500
 
+@app.route('/ai/future-task-recommendations', methods=['GET'])
+@login_required
+def get_future_task_recommendations():
+    """Get AI-generated future task recommendations based on ongoing tasks"""
+    try:
+        current_user_id = session['user_id']
+        
+        # Get user data
+        user = db_service.get_user(current_user_id)
+        if not user:
+            return jsonify({
+                "success": False,
+                "message": "User not found"
+            }), 404
+        
+        # Only allow coordinators and admins
+        if user.get('role') not in ['coordinator', 'admin']:
+            return jsonify({
+                "success": False,
+                "message": "Future task recommendations are only available to coordinators and administrators"
+            }), 403
+        
+        # Get ongoing tasks (not completed)
+        all_tasks = db_service.get_all_tasks()
+        ongoing_tasks = [task for task in all_tasks if task.get('status') not in ['Completed', 'Cancelled']]
+        
+        # Generate future task recommendations
+        recommendations = ai_service.generate_future_task_recommendations(ongoing_tasks, user)
+        
+        if recommendations['success']:
+            return jsonify(recommendations), 200
+        else:
+            return jsonify(recommendations), 500
+            
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Error generating future task recommendations: {str(e)}"
+        }), 500
+
 @app.route('/ai/task-recommendations', methods=['POST'])
 @login_required
 def get_task_volunteer_recommendations():
@@ -2445,12 +2485,20 @@ def get_task_volunteer_recommendations():
         response = ai_service.model.generate_content(prompt)
         
         try:
-            recommendations = json.loads(response.text)
+            # Clean the response text by removing markdown code blocks
+            response_text = response.text.strip()
+            if response_text.startswith('```json'):
+                response_text = response_text[7:]  # Remove ```json
+            if response_text.endswith('```'):
+                response_text = response_text[:-3]  # Remove ```
+            response_text = response_text.strip()
+            
+            recommendations = json.loads(response_text)
             return jsonify({
                 "success": True,
                 "recommendations": recommendations
             }), 200
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             # Fallback recommendations
             return jsonify({
                 "success": True,
@@ -2464,7 +2512,7 @@ def get_task_volunteer_recommendations():
                             "confidence": "Medium"
                         }
                     ],
-                    "reasoning": "Fallback recommendation due to AI parsing error"
+                    "reasoning": f"Fallback recommendation due to AI parsing error: {str(e)}"
                 }
             }), 200
             
@@ -2517,4 +2565,5 @@ def get_user_profile():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
